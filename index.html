@@ -985,7 +985,8 @@ async function quickDeleteEntry(entryId){
   if(!confirm('Delete this entry?'))return;
   const{error}=await sb.from('log_entries').delete().eq('id',entryId);
   if(error){toast('Error: '+error.message);return;}
-  await loadLog();renderDailyList();renderItems();toast('Entry deleted');
+  logEntries=logEntries.filter(e=>e.id!==entryId);
+  renderDailyList();renderItems();toast('Entry deleted');
 }
 function openEditLogModal(entryId){
   if(!isSupervisorOrAdmin()){toast('No permission');return;}
@@ -1004,11 +1005,23 @@ function closeEditLogModal(){document.getElementById('edit-log-modal').classList
 async function saveLogEntry(){
   const qty=parseFloat(document.getElementById('el-qty').value);
   if(!qty||qty<=0){toast('Enter a valid quantity');return;}
+  const entry_date=document.getElementById('el-date').value;
+  const supervisor_name=document.getElementById('el-super').value.trim();
+  const notes=document.getElementById('el-notes').value.trim();
   const btn=document.getElementById('btn-save-log-entry');btn.disabled=true;btn.textContent='Saving…';
-  const{error}=await sb.from('log_entries').update({qty,entry_date:document.getElementById('el-date').value,supervisor_name:document.getElementById('el-super').value.trim(),notes:document.getElementById('el-notes').value.trim()}).eq('id',editingLogId);
+  const{data,error}=await sb.from('log_entries')
+    .update({qty,entry_date,supervisor_name,notes})
+    .eq('id',editingLogId)
+    .select()
+    .single();
   btn.disabled=false;btn.textContent='Save';
   if(error){toast('Error: '+error.message);return;}
-  await loadLog();closeEditLogModal();renderLog();renderItems();renderDailyList();toast('Entry updated ✓');
+  // Update local state immediately so UI reflects change without full reload
+  const idx=logEntries.findIndex(e=>e.id===editingLogId);
+  if(idx!==-1){logEntries[idx]={...logEntries[idx],qty,entry_date,supervisor_name,notes};}
+  closeEditLogModal();
+  renderDailyList();renderItems();renderLog();
+  toast('Entry updated ✓');
 }
 async function deleteLogEntry(){
   if(!confirm('Delete this log entry? This cannot be undone.'))return;
@@ -1016,7 +1029,8 @@ async function deleteLogEntry(){
   const{error}=await sb.from('log_entries').delete().eq('id',editingLogId);
   btn.disabled=false;btn.textContent='Delete entry';
   if(error){toast('Error: '+error.message);return;}
-  await loadLog();closeEditLogModal();renderLog();renderItems();renderDailyList();toast('Entry deleted');
+  logEntries=logEntries.filter(e=>e.id!==editingLogId);
+  closeEditLogModal();renderDailyList();renderItems();renderLog();toast('Entry deleted');
 }
 
 // ── Daily report ───────────────────────────────────────────────────
