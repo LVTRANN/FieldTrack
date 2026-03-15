@@ -755,6 +755,7 @@ function renderItems(){
   if(!filtered.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div style="font-weight:600;margin-bottom:6px">${items.length?'No matches':'No items yet'}</div>${isAdmin()&&!items.length?'<button class="primary" onclick="showPage(\'setup\')">Go to Setup →</button>':''}</div>`;return;}
   const grouped={};
   filtered.forEach(it=>{const c=getEffectiveGroupName(it);if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
+  Object.values(grouped).forEach(arr=>arr.sort((a,b)=>(a.item_number||'').localeCompare(b.item_number||'',undefined,{numeric:true,sensitivity:'base'})));
   el.innerHTML=Object.entries(grouped).map(([cat,ci])=>{
     const isCollapsed=collapsedGroups.has(cat);
     const groupPct=ci.length?Math.round(ci.reduce((s,it)=>s+getPct(it),0)/ci.length):0;
@@ -909,6 +910,7 @@ function renderDailyList(){
 
   const grouped={};
   filtered.forEach(it=>{const c=getEffectiveGroupName(it);if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
+  Object.values(grouped).forEach(arr=>arr.sort((a,b)=>(a.item_number||'').localeCompare(b.item_number||'',undefined,{numeric:true,sensitivity:'base'})));
 
   el.innerHTML=Object.entries(grouped).map(([cat,ci])=>{
     const isCollapsed=collapsedGroups.has('daily-'+cat);
@@ -1048,6 +1050,7 @@ function renderReport(){
   const catsToday=[...new Set(Object.values(itemMap).map(d=>{const it=items.find(i=>i.id===d.itemId);return it?getEffectiveGroupName(it):'Ungrouped';}))].sort();
   const grouped={};
   Object.values(itemMap).forEach(d=>{const it=items.find(i=>i.id===d.itemId);const cat=it?getEffectiveGroupName(it):'Ungrouped';if(!grouped[cat])grouped[cat]=[];grouped[cat].push(d);});
+  Object.values(grouped).forEach(arr=>arr.sort((a,b)=>{const ia=items.find(i=>i.id===a.itemId);const ib=items.find(i=>i.id===b.itemId);return(ia?.item_number||'').localeCompare(ib?.item_number||'',undefined,{numeric:true,sensitivity:'base'});}));
   const tc=items.reduce((s,it)=>s+it.tendered_qty*it.unit_price,0);
   const te=items.reduce((s,it)=>s+getCompleted(it)*it.unit_price,0);
   const op=tc>0?Math.round(te/tc*100):0;
