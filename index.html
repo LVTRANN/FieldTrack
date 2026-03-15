@@ -233,7 +233,21 @@ a{color:var(--info-text);text-decoration:none;}
   <div id="page-items" class="page">
     <div class="sec-header">
       <div class="sec-title">Contract items</div>
-      <button id="btn-add-item" onclick="openAddItemModal()">+ Add item</button>
+      <div style="display:flex;gap:8px">
+        <button id="btn-select-mode" onclick="toggleSelectMode()">Select</button>
+        <button id="btn-add-item" onclick="openAddItemModal()">+ Add item</button>
+      </div>
+    </div>
+    <!-- Selection toolbar (shown in select mode) -->
+    <div id="select-toolbar" style="display:none;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="select-all-chk" onchange="toggleSelectAll(this.checked)" style="width:16px;height:16px;cursor:pointer">
+        <span id="select-count" style="font-size:13px;color:var(--text2)">0 selected</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="sm danger" id="btn-delete-selected" onclick="deleteSelectedItems()" disabled>Delete selected</button>
+        <button class="sm" onclick="toggleSelectMode()">Cancel</button>
+      </div>
     </div>
     <div class="search-wrap">
       <span class="search-icon">⌕</span>
@@ -302,6 +316,7 @@ a{color:var(--info-text);text-decoration:none;}
         <textarea id="csv-paste" rows="4" style="font-family:var(--mono);font-size:12px" placeholder="101,150mm PVC Watermain,m,850,85.00,Watermain"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="primary" id="btn-import-csv" onclick="importCSVText()">Import</button>
+          <button class="danger" onclick="deleteAllItems()">Delete all items</button>
         </div>
         <div id="upload-feedback" style="margin-top:8px;font-size:12px;color:var(--text2)"></div>
       </div>
@@ -357,6 +372,21 @@ a{color:var(--info-text);text-decoration:none;}
   </div>
 </div>
 
+<!-- Column Mapping Modal -->
+<div class="modal-bg" id="map-modal" onclick="if(event.target===this)closeMapModal()">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Match your columns</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">We found these columns in your file. Tell us what each one contains — skip any that aren't relevant.</div>
+    <div id="map-fields"></div>
+    <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;margin:14px 0;font-size:12px;color:var(--text2)" id="map-preview"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button style="flex:1" onclick="closeMapModal()">Cancel</button>
+      <button class="primary" style="flex:1" id="btn-confirm-map" onclick="confirmMapping()">Import items</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -375,6 +405,7 @@ let activeItemCat = 'All';
 let activeDailyCat = 'All';
 let editingItemId = null;
 let dailyItemId = null;
+let selectMode = false;
 
 const CAT_COLORS = {
   'Watermain':     {bg:'#e6f1fb',text:'#0c447c'},
@@ -653,9 +684,10 @@ function renderItems(){
         <div><div class="item-stat-label">Earned</div><div class="item-stat-value">${fmtC(c*it.unit_price)}</div></div>
       </div>
       <div style="display:flex;gap:6px">
-        ${isSupervisorOrAdmin()?`<button class="sm primary" onclick="openDailyModal('${it.id}')" style="flex:1">+ Log</button>`:''}
-        ${isAdmin()?`<button class="sm" onclick="openEditItem('${it.id}')" style="flex:1">Edit</button>`:''}
-        ${isAdmin()?`<button class="sm danger" onclick="deleteItem('${it.id}','${it.description.replace(/'/g,"\\'")}')">Delete</button>`:''}
+        ${selectMode?`<input type="checkbox" class="item-chk" data-id="${it.id}" onchange="updateSelectionCount()" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;margin-top:2px">`:''}
+        ${isSupervisorOrAdmin()&&!selectMode?`<button class="sm primary" onclick="openDailyModal('${it.id}')" style="flex:1">+ Log</button>`:''}
+        ${isAdmin()&&!selectMode?`<button class="sm" onclick="openEditItem('${it.id}')" style="flex:1">Edit</button>`:''}
+        ${isAdmin()&&!selectMode?`<button class="sm danger" onclick="deleteItem('${it.id}','${it.description.replace(/'/g,"\\'")}')">Delete</button>`:''}
       </div>
     </div>`;
   }).join('')}</div>`).join('');
@@ -905,21 +937,124 @@ async function saveItem(){
   await loadItems();closeModal();renderItems();updateLogFilters();toast('Item saved ✓');
 }
 
-async function deleteItem(id, desc){
+async function deleteAllItems(){
+  if(!isAdmin()){toast('Only admins can delete items');return;}
+  if(!projectId){toast('No project loaded');return;}
+  if(!confirm(`Delete ALL ${items.length} items and every log entry?\n\nThis cannot be undone.`))return;
+  const {error:e1}=await sb.from('log_entries').delete().eq('project_id',projectId);
+  if(e1){toast('Error: '+e1.message);return;}
+  const {error:e2}=await sb.from('items').delete().eq('project_id',projectId);
+  if(e2){toast('Error: '+e2.message);return;}
+  await loadItems();await loadLog();renderItems();updateLogFilters();renderDashboard();
+  toast('All items deleted');
+}
+
+async function deleteItem(id,desc){
   if(!isAdmin()){toast('Only admins can delete items');return;}
   if(!confirm(`Delete "${desc}"?\n\nThis will also delete all log entries for this item. This cannot be undone.`))return;
+  const {error:e1}=await sb.from('log_entries').delete().eq('item_id',id);
+  if(e1){toast('Error: '+e1.message);return;}
   const {error}=await sb.from('items').delete().eq('id',id);
   if(error){toast('Error: '+error.message);return;}
   await loadItems();await loadLog();renderItems();updateLogFilters();renderDashboard();toast('Item deleted');
 }
 
-// ── CSV import ─────────────────────────────────────────────────────
+function toggleSelectMode(){
+  if(!isAdmin()){toast('Only admins can delete items');return;}
+  selectMode=!selectMode;
+  const toolbar=document.getElementById('select-toolbar');
+  const btn=document.getElementById('btn-select-mode');
+  toolbar.style.display=selectMode?'flex':'none';
+  btn.textContent=selectMode?'Done':'Select';
+  document.getElementById('btn-add-item').style.display=selectMode?'none':'';
+  document.getElementById('select-all-chk').checked=false;
+  document.getElementById('select-count').textContent='0 selected';
+  document.getElementById('btn-delete-selected').disabled=true;
+  renderItems();
+}
+
+function updateSelectionCount(){
+  const chks=document.querySelectorAll('.item-chk:checked');
+  const total=document.querySelectorAll('.item-chk').length;
+  const count=chks.length;
+  document.getElementById('select-count').textContent=count===0?'0 selected':`${count} of ${total} selected`;
+  document.getElementById('btn-delete-selected').disabled=count===0;
+  document.getElementById('select-all-chk').checked=count===total&&total>0;
+  document.getElementById('select-all-chk').indeterminate=count>0&&count<total;
+}
+
+function toggleSelectAll(checked){
+  document.querySelectorAll('.item-chk').forEach(chk=>chk.checked=checked);
+  updateSelectionCount();
+}
+
+async function deleteSelectedItems(){
+  const chks=[...document.querySelectorAll('.item-chk:checked')];
+  if(!chks.length)return;
+  const ids=chks.map(c=>c.dataset.id);
+  const names=chks.map(c=>{const it=items.find(i=>i.id===c.dataset.id);return it?it.item_number+' '+it.description:'item';});
+  if(!confirm(`Delete ${ids.length} item${ids.length!==1?'s':''}?\n\n${names.slice(0,5).join('\n')}${names.length>5?`\n…and ${names.length-5} more`:''}\n\nAll log entries for these items will also be deleted. This cannot be undone.`))return;
+  const btn=document.getElementById('btn-delete-selected');
+  btn.disabled=true;btn.textContent='Deleting…';
+  const {error:e1}=await sb.from('log_entries').delete().in('item_id',ids);
+  if(e1){toast('Error: '+e1.message);btn.disabled=false;btn.textContent='Delete selected';return;}
+  const {error:e2}=await sb.from('items').delete().in('id',ids);
+  if(e2){toast('Error: '+e2.message);btn.disabled=false;btn.textContent='Delete selected';return;}
+  await loadItems();await loadLog();
+  selectMode=false;
+  document.getElementById('select-toolbar').style.display='none';
+  document.getElementById('btn-select-mode').textContent='Select';
+  document.getElementById('btn-add-item').style.display='';
+  renderItems();updateLogFilters();renderDashboard();
+  toast(`${ids.length} item${ids.length!==1?'s':''} deleted`);
+}
+
+// ── Smart column mapping import ────────────────────────────────────
+let mappingRows = []; // raw rows from file
+let mappingHeaders = []; // header row
+
+const FIELD_DEFS = [
+  { key:'item_number',  label:'Item number',   required:false, hint:'e.g. 101, A-01' },
+  { key:'description',  label:'Description',   required:true,  hint:'Item name / scope of work' },
+  { key:'unit',         label:'Unit',          required:false, hint:'e.g. m, ea, m3, tonne' },
+  { key:'tendered_qty', label:'Tendered qty',  required:false, hint:'Contract quantity' },
+  { key:'unit_price',   label:'Unit price ($)', required:false, hint:'Price per unit' },
+  { key:'category',     label:'Category',      required:false, hint:'e.g. Watermain, Concrete' },
+];
+
+// Common aliases for auto-detection
+const ALIASES = {
+  item_number:  ['item','item no','item #','item number','item_no','no','#','ref','code','pay item','pay item no'],
+  description:  ['description','desc','item description','work description','scope','name','activity','pay item description'],
+  unit:         ['unit','uom','unit of measure','units'],
+  tendered_qty: ['quantity','qty','tendered qty','tendered quantity','estimated qty','estimated quantity','contract qty','amount'],
+  unit_price:   ['unit price','price','rate','unit rate','unit cost','cost','$/unit','unit price ($)'],
+  category:     ['category','cat','section','division','trade','type','group'],
+};
+
+function guessMapping(headers){
+  const map={};
+  headers.forEach((h,i)=>{
+    const norm=h.toLowerCase().trim();
+    for(const [field,aliases] of Object.entries(ALIASES)){
+      if(!map[field] && aliases.some(a=>norm===a||norm.includes(a))){
+        map[field]=String(i);
+      }
+    }
+  });
+  return map;
+}
+
 function handleFileUpload(input){
   const file=input.files[0];if(!file)return;
   const ext=file.name.split('.').pop().toLowerCase();
   const reader=new FileReader();
   if(ext==='csv'){
-    reader.onload=e=>parseCSV(e.target.result);
+    reader.onload=e=>{
+      const lines=e.target.result.trim().split('\n');
+      const rows=lines.map(l=>l.split(',').map(c=>c.trim().replace(/^["']|["']$/g,'')));
+      openMappingModal(rows);
+    };
     reader.readAsText(file);
   } else if(ext==='xlsx'||ext==='xls'){
     reader.onload=e=>{
@@ -928,49 +1063,113 @@ function handleFileUpload(input){
         const wb=XLSX.read(data,{type:'array'});
         const ws=wb.Sheets[wb.SheetNames[0]];
         const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-        // Convert rows to CSV-style text and parse
-        const lines=rows.map(r=>r.map(c=>String(c).trim()).join(','));
-        parseCSV(lines.join('\n'));
+        const cleaned=rows.map(r=>r.map(c=>String(c).trim()));
+        openMappingModal(cleaned);
       } catch(err){
-        toast('Could not read Excel file: '+err.message);
-        document.getElementById('upload-feedback').textContent='Error reading file. Make sure it is a valid .xlsx or .xls file.';
+        toast('Could not read file: '+err.message);
       }
     };
     reader.readAsArrayBuffer(file);
   } else {
     toast('Please upload a .csv, .xlsx, or .xls file');
   }
-  // Reset input so same file can be re-uploaded
   input.value='';
 }
-function importCSVText(){const text=document.getElementById('csv-paste').value.trim();if(!text){toast('Paste some CSV data first');return;}parseCSV(text);}
 
-async function parseCSV(text){
+function openMappingModal(rows){
+  // Find first non-empty row as header
+  const headerIdx=rows.findIndex(r=>r.some(c=>c.trim()!==''));
+  if(headerIdx===-1){toast('File appears to be empty');return;}
+  mappingHeaders=rows[headerIdx];
+  mappingRows=rows.slice(headerIdx+1).filter(r=>r.some(c=>String(c).trim()!==''));
+  if(!mappingRows.length){toast('No data rows found after the header');return;}
+
+  const autoMap=guessMapping(mappingHeaders);
+  const colOptions=`<option value="">— Skip —</option>`+mappingHeaders.map((h,i)=>`<option value="${i}">${h||'Column '+(i+1)}</option>`).join('');
+
+  document.getElementById('map-fields').innerHTML=FIELD_DEFS.map(f=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="width:130px;flex-shrink:0">
+        <div style="font-size:13px;font-weight:500">${f.label}${f.required?'<span style="color:var(--danger-text)"> *</span>':''}</div>
+        <div style="font-size:11px;color:var(--text3)">${f.hint}</div>
+      </div>
+      <select id="map-${f.key}" style="flex:1">
+        ${colOptions.replace(`value="${autoMap[f.key]||''}"`,`value="${autoMap[f.key]||''}" selected`)}
+      </select>
+    </div>`).join('');
+
+  updateMapPreview();
+  // Update preview when any select changes
+  document.querySelectorAll('[id^="map-"]').forEach(sel=>sel.addEventListener('change',updateMapPreview));
+  document.getElementById('map-modal').classList.add('open');
+}
+
+function updateMapPreview(){
+  const descCol=document.getElementById('map-description')?.value;
+  const el=document.getElementById('map-preview');
+  if(!descCol){el.textContent='Select a Description column to see a preview.';return;}
+  const sample=mappingRows.slice(0,3).map(r=>{
+    const num=document.getElementById('map-item_number')?.value;
+    const desc=r[parseInt(descCol)]||'—';
+    const qty=document.getElementById('map-tendered_qty')?.value;
+    const price=document.getElementById('map-unit_price')?.value;
+    return`${num!==''?r[parseInt(num)]+' — ':''}${desc}${qty!==''?' · qty: '+r[parseInt(qty)]:''}${price!==''?' · $'+r[parseInt(price)]:''}`;
+  }).join('\n');
+  el.textContent='Preview:\n'+sample+(mappingRows.length>3?`\n…and ${mappingRows.length-3} more rows`:'');
+}
+
+function closeMapModal(){document.getElementById('map-modal').classList.remove('open');}
+
+async function confirmMapping(){
   if(!isAdmin()){toast('Only admins can import items');return;}
-  if(!projectId){toast('Save your project first in Setup');return;}
-  const lines=text.trim().split('\n');let imported=0,skipped=0;
-  const fl=lines[0].toLowerCase();
-  const si=fl.includes('item')||fl.includes('description')||fl.includes('unit')?1:0;
+  if(!projectId){toast('Save your project first');return;}
+
+  const getCol=key=>{const v=document.getElementById('map-'+key)?.value;return v!==''&&v!==undefined?parseInt(v):null;};
+  const descCol=getCol('description');
+  if(descCol===null){toast('Description column is required');return;}
+
   const toInsert=[];
-  for(let i=si;i<lines.length;i++){
-    const raw=lines[i].trim();if(!raw)continue;
-    const parts=raw.split(',').map(p=>p.trim().replace(/^["']|["']$/g,''));
-    if(parts.length<2){skipped++;continue;}
-    const[num,desc,unit,qtyStr,priceStr,cat]=parts;
-    if(!desc){skipped++;continue;}
-    toInsert.push({project_id:projectId,item_number:num||String(i),description:desc,unit:unit||'ea',tendered_qty:parseFloat(qtyStr)||0,unit_price:parseFloat(priceStr)||0,category:cat||'Misc'});
-    imported++;
-  }
-  if(!toInsert.length){toast('No valid rows found');return;}
-  const btn=document.getElementById('btn-import-csv');
+  let skipped=0;
+  mappingRows.forEach(r=>{
+    const desc=r[descCol]?.toString().trim();
+    if(!desc){skipped++;return;}
+    const numCol=getCol('item_number');
+    const unitCol=getCol('unit');
+    const qtyCol=getCol('tendered_qty');
+    const priceCol=getCol('unit_price');
+    const catCol=getCol('category');
+    // Skip rows that look like subtotals/headers (description is a number or all caps short string)
+    toInsert.push({
+      project_id:projectId,
+      item_number:numCol!==null?r[numCol]?.toString().trim()||'':'',
+      description:desc,
+      unit:unitCol!==null?r[unitCol]?.toString().trim()||'ea':'ea',
+      tendered_qty:qtyCol!==null?parseFloat(r[qtyCol])||0:0,
+      unit_price:priceCol!==null?parseFloat(r[priceCol])||0:0,
+      category:catCol!==null?r[catCol]?.toString().trim()||'Misc':'Misc',
+    });
+  });
+
+  if(!toInsert.length){toast('No valid rows to import');return;}
+
+  const btn=document.getElementById('btn-confirm-map');
   btn.disabled=true;btn.textContent='Importing…';
   const {error}=await sb.from('items').insert(toInsert);
-  btn.disabled=false;btn.textContent='Import';
-  if(error){toast('Error: '+error.message);document.getElementById('upload-feedback').textContent='Error: '+error.message;return;}
-  await loadItems();updateLogFilters();
-  const msg=`Imported ${imported} item${imported!==1?'s':''}${skipped?' ('+skipped+' skipped)':''}`;
+  btn.disabled=false;btn.textContent='Import items';
+  if(error){toast('Error: '+error.message);return;}
+
+  await loadItems();updateLogFilters();closeMapModal();
+  const msg=`Imported ${toInsert.length} item${toInsert.length!==1?'s':''}${skipped?' ('+skipped+' blank rows skipped)':''}`;
   document.getElementById('upload-feedback').textContent=msg;
   toast(msg);renderItems();renderDashboard();
+}
+
+function importCSVText(){
+  const text=document.getElementById('csv-paste').value.trim();
+  if(!text){toast('Paste some CSV data first');return;}
+  const lines=text.trim().split('\n');
+  const rows=lines.map(l=>l.split(',').map(c=>c.trim().replace(/^["']|["']$/g,'')));
+  openMappingModal(rows);
 }
 
 // ── Auth listener ──────────────────────────────────────────────────
