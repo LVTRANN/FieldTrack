@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#ffffff">
 <title>FieldTrack</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#ffffff;--bg2:#f5f4f0;--bg3:#eeedea;
@@ -289,12 +290,12 @@ a{color:var(--info-text);text-decoration:none;}
 
     <div class="card" id="setup-import-card">
       <div class="sec-title" style="margin-bottom:4px">Import contract items</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">CSV columns: Item #, Description, Unit, Quantity, Unit Price, Category</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Columns needed: Item #, Description, Unit, Quantity, Unit Price, Category</div>
       <div class="upload-zone" onclick="document.getElementById('file-input').click()">
         <div style="font-size:28px;margin-bottom:8px">📂</div>
-        <div style="font-weight:500;margin-bottom:3px">Tap to upload CSV</div>
-        <div style="font-size:12px;color:var(--text2)">Or paste data below</div>
-        <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleFileUpload(this)">
+        <div style="font-weight:500;margin-bottom:3px">Tap to upload Excel or CSV</div>
+        <div style="font-size:12px;color:var(--text2)">.xlsx, .xls, .csv all supported</div>
+        <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFileUpload(this)">
       </div>
       <div style="margin-top:14px">
         <label>Paste CSV data</label>
@@ -904,7 +905,35 @@ async function saveItem(){
 }
 
 // ── CSV import ─────────────────────────────────────────────────────
-function handleFileUpload(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>parseCSV(e.target.result);reader.readAsText(file);}
+function handleFileUpload(input){
+  const file=input.files[0];if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  if(ext==='csv'){
+    reader.onload=e=>parseCSV(e.target.result);
+    reader.readAsText(file);
+  } else if(ext==='xlsx'||ext==='xls'){
+    reader.onload=e=>{
+      try{
+        const data=new Uint8Array(e.target.result);
+        const wb=XLSX.read(data,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        // Convert rows to CSV-style text and parse
+        const lines=rows.map(r=>r.map(c=>String(c).trim()).join(','));
+        parseCSV(lines.join('\n'));
+      } catch(err){
+        toast('Could not read Excel file: '+err.message);
+        document.getElementById('upload-feedback').textContent='Error reading file. Make sure it is a valid .xlsx or .xls file.';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    toast('Please upload a .csv, .xlsx, or .xls file');
+  }
+  // Reset input so same file can be re-uploaded
+  input.value='';
+}
 function importCSVText(){const text=document.getElementById('csv-paste').value.trim();if(!text){toast('Paste some CSV data first');return;}parseCSV(text);}
 
 async function parseCSV(text){
