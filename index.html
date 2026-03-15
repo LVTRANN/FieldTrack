@@ -283,10 +283,7 @@ a:hover{text-decoration:underline;}
         <span id="select-count" style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.7)">Tap items to select</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="move-to-group-select" style="font-size:12px;padding:5px 28px 5px 10px;height:32px;width:auto;background:#1e1d1a;color:#fff;border:1px solid rgba(255,255,255,0.2);">
-          <option value="" style="background:#1e1d1a;color:#fff">Move to group…</option>
-        </select>
-        <button class="sm" id="btn-move-to-group" onclick="moveSelectedToGroup()" disabled style="height:32px;background:var(--accent);color:#fff;border-color:var(--accent);">Move</button>
+        <button class="sm" id="btn-move-to-group" onclick="openMoveToGroupPicker()" disabled style="height:32px;background:var(--accent);color:#fff;border-color:var(--accent);">Move to group</button>
         <button class="sm danger" id="btn-delete-selected" onclick="deleteSelectedItems()" disabled style="height:32px;border-color:rgba(255,100,100,0.5);color:rgba(255,140,140,0.9);background:transparent;">Delete</button>
         <button class="sm" onclick="toggleSelectMode()" style="height:32px;color:rgba(255,255,255,0.6);border-color:rgba(255,255,255,0.2);background:transparent;">Cancel</button>
       </div>
@@ -1268,8 +1265,7 @@ function toggleSelectMode(){
   btn.textContent=selectMode?'Done':'Select';
   document.getElementById('btn-add-item').style.display=selectMode?'none':'';
   if(selectMode){
-    const sel=document.getElementById('move-to-group-select');
-    sel.innerHTML='<option value="" style="background:#1e1d1a;color:#fff">Move to group…</option>'+groups.map(g=>`<option value="${g.id}" style="background:#1e1d1a;color:#fff">${g.name}</option>`).join('');
+    // nothing extra needed — group picker is now a modal
   }
   updateSelectionCount();
   renderItems();
@@ -1307,22 +1303,7 @@ function toggleSelectAll(checked){
   });
 }
 
-async function moveSelectedToGroup(){
-  const groupId=document.getElementById('move-to-group-select').value;
-  if(!groupId){toast('Select a group first');return;}
-  const selected=[...document.querySelectorAll('.item-card.selected')];
-  if(!selected.length){toast('No items selected');return;}
-  const ids=selected.map(c=>c.id.replace('card-',''));
-  const group=groups.find(g=>g.id===groupId);
-  const btn=document.getElementById('btn-move-to-group');
-  btn.disabled=true;btn.textContent='Moving…';
-  const {error}=await sb.from('items').update({group_id:groupId}).in('id',ids);
-  btn.disabled=false;btn.textContent='Move';
-  if(error){toast('Error: '+error.message);return;}
-  await loadItems();
-  toggleSelectMode();
-  toast(`${ids.length} item${ids.length!==1?'s':''} moved to "${group?.name}" ✓`);
-}
+function openMoveToGroupPicker(){
   const selected=[...document.querySelectorAll('.item-card.selected')];
   if(!selected.length){toast('Select some items first');return;}
   const count=selected.length;
