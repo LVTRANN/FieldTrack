@@ -798,6 +798,7 @@ function renderItems(){
 }
 function setItemCat(cat){activeItemCat=cat;renderItems();}
 function toggleGroupCollapse(cat){if(collapsedGroups.has(cat))collapsedGroups.delete(cat);else collapsedGroups.add(cat);renderItems();}
+function toggleDailyGroupCollapse(cat){const key='daily-'+cat;if(collapsedGroups.has(key))collapsedGroups.delete(key);else collapsedGroups.add(key);renderDailyList();}
 
 // ── Select mode ────────────────────────────────────────────────────
 function toggleSelectMode(){
@@ -887,22 +888,33 @@ function renderDailyList(){
   let filtered=items;if(activeDailyCat!=='All')filtered=items.filter(it=>getEffectiveGroupName(it)===activeDailyCat);
   const el=document.getElementById('daily-items-list');
   const grouped={};filtered.forEach(it=>{const c=getEffectiveGroupName(it);if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
-  el.innerHTML=Object.entries(grouped).map(([cat,ci])=>`<div>
-    <div class="cat-header" style="cursor:default">
-      <div class="cat-header-left"><span class="badge-cat" style="${catStyle(cat)}">${cat}</span></div>
-    </div>
-    ${ci.map(it=>{const c=getCompleted(it);const p=getPct(it);return`<div class="item-card">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
-        <div><div class="item-card-title">${it.item_number} — ${it.description}</div><div class="item-card-sub">${fmtN(c)} / ${fmtN(it.tendered_qty)} ${it.unit}</div></div>
-        ${statusBadge(p)}
+  el.innerHTML=Object.entries(grouped).map(([cat,ci])=>{
+    const isCollapsed=collapsedGroups.has('daily-'+cat);
+    const safeCat=cat.replace(/'/g,"\\'");
+    const done=ci.filter(it=>getPct(it)>=100).length;
+    return`<div>
+      <div class="cat-header" onclick="toggleDailyGroupCollapse('${safeCat}')">
+        <div class="cat-header-left">
+          <svg class="cat-chevron${isCollapsed?' collapsed':''}" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="badge-cat" style="${catStyle(cat)}">${cat}</span>
+          <span style="font-size:10px;color:var(--text3)">${ci.length} item${ci.length!==1?'s':''}${done>0?' · '+done+' complete':''}</span>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <div class="prog-track"><div class="prog-fill ${pctClass(p)}" style="width:${p}%"></div></div>
-        <span style="font-size:12px;min-width:32px;text-align:right">${p}%</span>
+      <div class="cat-items${isCollapsed?' collapsed':''}">
+        ${ci.map(it=>{const c=getCompleted(it);const p=getPct(it);return`<div class="item-card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+            <div><div class="item-card-title">${it.item_number} — ${it.description}</div><div class="item-card-sub">${fmtN(c)} / ${fmtN(it.tendered_qty)} ${it.unit}</div></div>
+            ${statusBadge(p)}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <div class="prog-track"><div class="prog-fill ${pctClass(p)}" style="width:${p}%"></div></div>
+            <span style="font-size:12px;min-width:32px;text-align:right">${p}%</span>
+          </div>
+          <button class="primary block" onclick="openDailyModal('${it.id}')">+ Log today's quantity</button>
+        </div>`;}).join('')}
       </div>
-      <button class="primary block" onclick="openDailyModal('${it.id}')">+ Log today's quantity</button>
-    </div>`;}).join('')}
-  </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function openDailyModal(itemId){
   if(!isSupervisorOrAdmin()){toast('No permission to log entries');return;}
