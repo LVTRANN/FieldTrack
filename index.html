@@ -302,6 +302,16 @@ a{color:var(--info-text);text-decoration:none;}
       <button class="primary block" id="btn-save-project" onclick="saveProject()">Save project</button>
     </div>
 
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:4px">Groups</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Create groups to organise your items. Groups appear on the Items page, Daily Entry, and Reports.</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="new-group-name" placeholder="e.g. Watermain, Road Building…" style="flex:1" onkeydown="if(event.key==='Enter')addGroup()">
+        <button onclick="addGroup()">Add group</button>
+      </div>
+      <div id="groups-list"></div>
+    </div>
+
     <div class="card" id="setup-import-card">
       <div class="sec-title" style="margin-bottom:4px">Import contract items</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Columns needed: Item #, Description, Unit, Quantity, Unit Price, Category</div>
@@ -346,6 +356,7 @@ a{color:var(--info-text);text-decoration:none;}
       <div class="field"><label>Unit price ($)</label><input type="number" id="mi-price" step="0.01" placeholder="85.00" inputmode="decimal"></div>
     </div>
     <div class="field"><label>Category</label><input type="text" id="mi-cat" placeholder="Watermain, Road Building, Concrete…"></div>
+    <div class="field"><label>Group</label><select id="mi-group"><option value="">— No group —</option></select></div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button style="flex:1" onclick="closeModal()">Cancel</button>
       <button class="primary" style="flex:1" id="btn-save-item" onclick="saveItem()">Save</button>
@@ -368,6 +379,20 @@ a{color:var(--info-text);text-decoration:none;}
     <div style="display:flex;gap:8px;margin-top:4px">
       <button style="flex:1" onclick="closeDailyModal()">Cancel</button>
       <button class="primary" style="flex:1" id="btn-submit-entry" onclick="submitDailyEntry()">Log entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename Group Modal -->
+<div class="modal-bg" id="rename-group-modal" onclick="if(event.target===this)closeRenameGroupModal()">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Rename group</div>
+    <div class="field"><label>Group name</label><input type="text" id="rename-group-input" placeholder="Group name"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px" id="rename-group-info"></div>
+    <div style="display:flex;gap:8px">
+      <button style="flex:1" onclick="closeRenameGroupModal()">Cancel</button>
+      <button class="primary" style="flex:1" onclick="confirmRenameGroup()">Save</button>
     </div>
   </div>
 </div>
@@ -401,10 +426,12 @@ let currentProfile = null;
 let projectId = null;
 let items = [];
 let logEntries = [];
+let groups = []; // {id, name, sort_order}
 let activeItemCat = 'All';
 let activeDailyCat = 'All';
 let editingItemId = null;
 let dailyItemId = null;
+let renamingGroupName = null;
 let selectMode = false;
 
 const CAT_COLORS = {
@@ -484,6 +511,7 @@ async function bootstrap(){
 
   // Load data
   await loadProject();
+  await loadGroups();
   await loadItems();
   await loadLog();
 
@@ -540,6 +568,112 @@ async function loadLog(){
   const {data,error}=await sb.from('log_entries').select('*').eq('project_id',projectId).order('entry_date',{ascending:false});
   logEntries=data||[];
   if(error) console.error(error);
+}
+
+async function loadGroups(){
+  if(!projectId){groups=[];return;}
+  const {data}=await sb.from('groups').select('*').eq('project_id',projectId).order('sort_order');
+  groups=data||[];
+  renderGroupsList();
+  populateGroupSelects();
+}
+
+// ── Groups management ──────────────────────────────────────────────
+function getItemGroup(item){
+  if(!item.group_id) return null;
+  return groups.find(g=>g.id===item.group_id)||null;
+}
+function getEffectiveGroupName(item){
+  const g=getItemGroup(item);
+  return g?g.name:(item.category||'Ungrouped');
+}
+
+async function addGroup(){
+  if(!isAdmin()){toast('Only admins can manage groups');return;}
+  if(!projectId){toast('Save your project first');return;}
+  const name=document.getElementById('new-group-name').value.trim();
+  if(!name){toast('Enter a group name');return;}
+  const sort_order=groups.length;
+  const {data,error}=await sb.from('groups').insert({project_id:projectId,name,sort_order}).select().single();
+  if(error){toast('Error: '+error.message);return;}
+  groups.push(data);
+  document.getElementById('new-group-name').value='';
+  renderGroupsList();
+  populateGroupSelects();
+  toast('Group added ✓');
+}
+
+async function deleteGroup(id){
+  if(!isAdmin()){toast('Only admins can manage groups');return;}
+  const g=groups.find(g=>g.id===id);
+  if(!confirm(`Delete group "${g?.name}"?\n\nItems in this group will become ungrouped.`))return;
+  // Unassign items from this group
+  await sb.from('items').update({group_id:null}).eq('group_id',id);
+  const {error}=await sb.from('groups').delete().eq('id',id);
+  if(error){toast('Error: '+error.message);return;}
+  groups=groups.filter(g=>g.id!==id);
+  await loadItems();
+  renderGroupsList();
+  populateGroupSelects();
+  renderItems();
+  toast('Group deleted');
+}
+
+function openRenameGroupModal(id){
+  const g=groups.find(g=>g.id===id);if(!g)return;
+  renamingGroupName=id;
+  document.getElementById('rename-group-input').value=g.name;
+  const count=items.filter(it=>it.group_id===id).length;
+  document.getElementById('rename-group-info').textContent=`${count} item${count!==1?'s':''} in this group`;
+  document.getElementById('rename-group-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('rename-group-input').focus(),200);
+}
+function closeRenameGroupModal(){document.getElementById('rename-group-modal').classList.remove('open');renamingGroupName=null;}
+
+async function confirmRenameGroup(){
+  const name=document.getElementById('rename-group-input').value.trim();
+  if(!name){toast('Enter a name');return;}
+  const {error}=await sb.from('groups').update({name}).eq('id',renamingGroupName);
+  if(error){toast('Error: '+error.message);return;}
+  const g=groups.find(g=>g.id===renamingGroupName);
+  if(g) g.name=name;
+  closeRenameGroupModal();
+  renderGroupsList();
+  populateGroupSelects();
+  renderItems();
+  toast('Group renamed ✓');
+}
+
+function renderGroupsList(){
+  const el=document.getElementById('groups-list');
+  if(!el) return;
+  if(!groups.length){
+    el.innerHTML='<div style="font-size:13px;color:var(--text2);padding:8px 0">No groups yet. Add one above.</div>';
+    return;
+  }
+  el.innerHTML=groups.map(g=>{
+    const count=items.filter(it=>it.group_id===g.id).length;
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:0.5px solid var(--border)">
+      <div>
+        <span style="font-size:13px;font-weight:500">${g.name}</span>
+        <span style="font-size:12px;color:var(--text2);margin-left:8px">${count} item${count!==1?'s':''}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="sm" onclick="openRenameGroupModal('${g.id}')">Rename</button>
+        <button class="sm danger" onclick="deleteGroup('${g.id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function populateGroupSelects(){
+  // Item edit modal
+  const sel=document.getElementById('mi-group');
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML='<option value="">— No group —</option>'+groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+    sel.value=cur;
+  }
 }
 
 async function loadUsers(){
@@ -607,9 +741,9 @@ function renderDashboard(){
   const ci=items.filter(it=>getPct(it)>=100).length;
   const ip=items.filter(it=>{const p=getPct(it);return p>0&&p<100;}).length;
   const r=32,circ=(2*Math.PI*r);
-  const cats=[...new Set(items.map(it=>it.category||'Misc'))].sort();
+  const cats=[...new Set(items.map(it=>getEffectiveGroupName(it)))].sort();
   const catSum=cats.map(cat=>{
-    const ci2=items.filter(it=>(it.category||'Misc')===cat);
+    const ci2=items.filter(it=>getEffectiveGroupName(it)===cat);
     const cv=ci2.reduce((s,it)=>s+it.tendered_qty*it.unit_price,0);
     const ce=ci2.reduce((s,it)=>s+getCompleted(it)*it.unit_price,0);
     return{cat,cv,ce,cp:cv>0?Math.round(ce/cv*100):0};
@@ -666,7 +800,7 @@ function renderItems(){
   if(activeItemCat!=='All')filtered=filtered.filter(it=>(it.category||'Misc')===activeItemCat);
   if(!filtered.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div style="font-weight:500;margin-bottom:6px">${items.length?'No matches':'No items yet'}</div>${isAdmin()&&!items.length?'<button class="primary" onclick="showPage(\'setup\')">Go to Setup →</button>':''}</div>`;return;}
   const grouped={};
-  filtered.forEach(it=>{const c=it.category||'Misc';if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
+  filtered.forEach(it=>{const c=getEffectiveGroupName(it);if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
   el.innerHTML=Object.entries(grouped).map(([cat,ci])=>`<div><div class="cat-header"><span class="badge-cat" style="${catStyle(cat)}">${cat}</span></div>${ci.map(it=>{
     const c=getCompleted(it);const p=getPct(it);
     return`<div class="item-card">
@@ -708,7 +842,7 @@ function setDailyCat(cat){activeDailyCat=cat;renderDailyList();}
 function renderDailyList(){
   let filtered=items;if(activeDailyCat!=='All')filtered=items.filter(it=>(it.category||'Misc')===activeDailyCat);
   const el=document.getElementById('daily-items-list');
-  const grouped={};filtered.forEach(it=>{const c=it.category||'Misc';if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
+  const grouped={};filtered.forEach(it=>{const c=getEffectiveGroupName(it);if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
   el.innerHTML=Object.entries(grouped).map(([cat,ci])=>`<div><div class="cat-header"><span class="badge-cat" style="${catStyle(cat)}">${cat}</span></div>${ci.map(it=>{
     const c=getCompleted(it);const p=getPct(it);
     return`<div class="item-card">
@@ -776,9 +910,9 @@ function renderReport(){
   dayEntries.forEach(e=>{if(!itemMap[e.item_id])itemMap[e.item_id]={itemId:e.item_id,totalQty:0,entries:[]};itemMap[e.item_id].totalQty+=Number(e.qty);itemMap[e.item_id].entries.push(e);});
   const supers=[...new Set(dayEntries.map(e=>e.supervisor_name).filter(Boolean))];
   const dayValue=Object.values(itemMap).reduce((s,d)=>{const it=items.find(i=>i.id===d.itemId);return s+(it?d.totalQty*it.unit_price:0);},0);
-  const catsToday=[...new Set(Object.values(itemMap).map(d=>{const it=items.find(i=>i.id===d.itemId);return it?it.category||'Misc':'Misc';}))].sort();
+  const catsToday=[...new Set(Object.values(itemMap).map(d=>{const it=items.find(i=>i.id===d.itemId);return it?getEffectiveGroupName(it):'Ungrouped';}))].sort();
   const grouped={};
-  Object.values(itemMap).forEach(d=>{const it=items.find(i=>i.id===d.itemId);const cat=it?it.category||'Misc':'Misc';if(!grouped[cat])grouped[cat]=[];grouped[cat].push(d);});
+  Object.values(itemMap).forEach(d=>{const it=items.find(i=>i.id===d.itemId);const cat=it?getEffectiveGroupName(it):'Ungrouped';if(!grouped[cat])grouped[cat]=[];grouped[cat].push(d);});
   const tc=items.reduce((s,it)=>s+it.tendered_qty*it.unit_price,0);
   const te=items.reduce((s,it)=>s+getCompleted(it)*it.unit_price,0);
   const op=tc>0?Math.round(te/tc*100):0;
@@ -879,7 +1013,7 @@ function renderLog(){
     const it=items.find(i=>i.id===e.item_id);
     return`<div class="log-entry"><div class="log-dot"></div><div style="flex:1">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        ${it?`<span class="badge-cat" style="${catStyle(it.category||'Misc')}">${it.category||'Misc'}</span>`:''}
+        ${it?`<span class="badge-cat" style="${catStyle(getEffectiveGroupName(it))}">${getEffectiveGroupName(it)}</span>`:''}
         <span style="font-weight:500;font-size:13px;flex:1">${it?it.item_number+' – '+it.description:'Unknown item'}</span>
         <span class="badge badge-gray" style="flex-shrink:0">${fmtN(e.qty)} ${it?it.unit:''}</span>
       </div>
@@ -894,6 +1028,8 @@ function openAddItemModal(){
   editingItemId=null;
   document.getElementById('item-modal-title').textContent='Add contract item';
   ['mi-num','mi-desc','mi-unit','mi-qty','mi-price','mi-cat'].forEach(id=>document.getElementById(id).value='');
+  populateGroupSelects();
+  document.getElementById('mi-group').value='';
   document.getElementById('item-modal').classList.add('open');
 }
 function openEditItem(id){
@@ -907,6 +1043,8 @@ function openEditItem(id){
   document.getElementById('mi-qty').value=it.tendered_qty||'';
   document.getElementById('mi-price').value=it.unit_price||'';
   document.getElementById('mi-cat').value=it.category||'';
+  populateGroupSelects();
+  document.getElementById('mi-group').value=it.group_id||'';
   document.getElementById('item-modal').classList.add('open');
 }
 function closeModal(){document.getElementById('item-modal').classList.remove('open');}
@@ -922,6 +1060,7 @@ async function saveItem(){
     tendered_qty:parseFloat(document.getElementById('mi-qty').value)||0,
     unit_price:parseFloat(document.getElementById('mi-price').value)||0,
     category:document.getElementById('mi-cat').value.trim()||'Misc',
+    group_id:document.getElementById('mi-group').value||null,
   };
   if(!payload.description){toast('Description is required');return;}
   const btn=document.getElementById('btn-save-item');
