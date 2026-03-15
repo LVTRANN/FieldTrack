@@ -304,7 +304,7 @@ a:hover{text-decoration:underline;}
   <div id="page-daily" class="page">
     <div class="sec-header"><div class="sec-title">Daily entry</div></div>
     <div class="form-row cols-2" style="margin-bottom:14px">
-      <div><label>Date</label><input type="date" id="entry-date"></div>
+      <div><label>Date</label><input type="date" id="entry-date" onchange="renderDailyList()"></div>
       <div><label>Your name</label><input type="text" id="entry-supervisor" placeholder="Your name"></div>
     </div>
     <div class="filter-row" id="daily-cat-filters"></div>
@@ -888,33 +888,67 @@ function renderDailyPage(){
 }
 function setDailyCat(cat){activeDailyCat=cat;renderDailyList();}
 function renderDailyList(){
-  let filtered=items;if(activeDailyCat!=='All')filtered=items.filter(it=>getEffectiveGroupName(it)===activeDailyCat);
+  const selectedDate=document.getElementById('entry-date')?.value||today();
   const el=document.getElementById('daily-items-list');
-  const grouped={};filtered.forEach(it=>{const c=getEffectiveGroupName(it);if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
+
+  // Find entries for selected date
+  const dateEntries=logEntries.filter(e=>e.entry_date===selectedDate);
+
+  // Filter items to only those with entries on this date
+  let filtered=items.filter(it=>dateEntries.some(e=>e.item_id===it.id));
+  if(activeDailyCat!=='All')filtered=filtered.filter(it=>getEffectiveGroupName(it)===activeDailyCat);
+
+  if(!filtered.length){
+    el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div>
+      <div style="font-weight:600;margin-bottom:6px">No entries for ${fmtDate(selectedDate)}</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Use the Items tab to log quantities for this date.</div>
+      <button class="primary" onclick="showPage('items')">Go to Items →</button>
+    </div>`;
+    return;
+  }
+
+  const grouped={};
+  filtered.forEach(it=>{const c=getEffectiveGroupName(it);if(!grouped[c])grouped[c]=[];grouped[c].push(it);});
+
   el.innerHTML=Object.entries(grouped).map(([cat,ci])=>{
     const isCollapsed=collapsedGroups.has('daily-'+cat);
     const safeCat=cat.replace(/'/g,"\\'");
-    const done=ci.filter(it=>getPct(it)>=100).length;
     return`<div>
       <div class="cat-header" onclick="toggleDailyGroupCollapse('${safeCat}')">
         <div class="cat-header-left">
           <svg class="cat-chevron${isCollapsed?' collapsed':''}" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span class="badge-cat" style="${catStyle(cat)}">${cat}</span>
-          <span style="font-size:10px;color:var(--text3)">${ci.length} item${ci.length!==1?'s':''}${done>0?' · '+done+' complete':''}</span>
+          <span style="font-size:10px;color:var(--text3)">${ci.length} item${ci.length!==1?'s':''}</span>
         </div>
       </div>
       <div class="cat-items${isCollapsed?' collapsed':''}">
-        ${ci.map(it=>{const c=getCompleted(it);const p=getPct(it);return`<div class="item-card">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
-            <div><div class="item-card-title">${it.item_number} — ${it.description}</div><div class="item-card-sub">${fmtN(c)} / ${fmtN(it.tendered_qty)} ${it.unit}</div></div>
-            ${statusBadge(p)}
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-            <div class="prog-track"><div class="prog-fill ${pctClass(p)}" style="width:${p}%"></div></div>
-            <span style="font-size:12px;min-width:32px;text-align:right">${p}%</span>
-          </div>
-          <button class="primary block" onclick="openDailyModal('${it.id}')">+ Log today's quantity</button>
-        </div>`;}).join('')}
+        ${ci.map(it=>{
+          const c=getCompleted(it);const p=getPct(it);
+          const itemEntries=dateEntries.filter(e=>e.item_id===it.id);
+          const dayTotal=itemEntries.reduce((s,e)=>s+Number(e.qty),0);
+          return`<div class="item-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+              <div><div class="item-card-title">${it.item_number} — ${it.description}</div><div class="item-card-sub">${fmtN(c)} / ${fmtN(it.tendered_qty)} ${it.unit} total</div></div>
+              ${statusBadge(p)}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+              <div class="prog-track"><div class="prog-fill ${pctClass(p)}" style="width:${p}%"></div></div>
+              <span style="font-size:12px;min-width:32px;text-align:right">${p}%</span>
+            </div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">
+              Entries on ${fmtDate(selectedDate)} — <span style="color:var(--accent)">${fmtN(dayTotal)} ${it.unit} total</span>
+            </div>
+            ${itemEntries.map(e=>`
+              <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg2);border-radius:var(--r);margin-bottom:6px;border:1px solid var(--border)">
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:600">${fmtN(e.qty)} ${it.unit}</div>
+                  <div style="font-size:12px;color:var(--text2);margin-top:1px">${e.supervisor_name||'—'}${e.notes?' · <em>'+e.notes+'</em>':''}</div>
+                </div>
+                <button class="sm" onclick="openEditLogModal('${e.id}')" style="flex-shrink:0">Edit</button>
+                <button class="sm danger" onclick="quickDeleteEntry('${e.id}')" style="flex-shrink:0">Delete</button>
+              </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
   }).join('');
@@ -947,6 +981,12 @@ async function submitDailyEntry(){
 }
 
 // ── Edit log entry ─────────────────────────────────────────────────
+async function quickDeleteEntry(entryId){
+  if(!confirm('Delete this entry?'))return;
+  const{error}=await sb.from('log_entries').delete().eq('id',entryId);
+  if(error){toast('Error: '+error.message);return;}
+  await loadLog();renderDailyList();renderItems();toast('Entry deleted');
+}
 function openEditLogModal(entryId){
   if(!isSupervisorOrAdmin()){toast('No permission');return;}
   const e=logEntries.find(e=>e.id===entryId);if(!e)return;
