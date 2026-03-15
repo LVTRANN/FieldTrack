@@ -271,18 +271,18 @@ a:hover{text-decoration:underline;}
       </div>
     </div>
     <!-- Selection toolbar (shown in select mode) -->
-    <div id="select-toolbar" style="display:none;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--info-bg);border:0.5px solid var(--info-text);border-radius:var(--r);margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <div id="select-toolbar" style="display:none;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--nav-bg);border-bottom:1px solid var(--nav-border);flex-wrap:wrap;gap:8px;position:sticky;top:52px;z-index:40;margin:0 -16px 16px;padding-left:16px;padding-right:16px;box-shadow:0 2px 8px rgba(0,0,0,0.18);">
       <div style="display:flex;align-items:center;gap:10px">
-        <input type="checkbox" id="select-all-chk" onchange="toggleSelectAll(this.checked)" style="width:16px;height:16px;cursor:pointer">
-        <span id="select-count" style="font-size:13px;font-weight:500;color:var(--info-text)">0 selected</span>
+        <input type="checkbox" id="select-all-chk" onchange="toggleSelectAll(this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+        <span id="select-count" style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.7)">Tap items to select</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="move-to-group-select" style="font-size:12px;padding:5px 28px 5px 10px;height:32px;width:auto">
-          <option value="">Move to group…</option>
+        <select id="move-to-group-select" style="font-size:12px;padding:5px 28px 5px 10px;height:32px;width:auto;background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.2);">
+          <option value="" style="background:var(--nav-bg)">Move to group…</option>
         </select>
-        <button class="sm" id="btn-move-to-group" onclick="moveSelectedToGroup()" disabled style="height:32px">Move</button>
-        <button class="sm danger" id="btn-delete-selected" onclick="deleteSelectedItems()" disabled style="height:32px">Delete</button>
-        <button class="sm" onclick="toggleSelectMode()" style="height:32px">Cancel</button>
+        <button class="sm" id="btn-move-to-group" onclick="moveSelectedToGroup()" disabled style="height:32px;background:var(--accent);color:#fff;border-color:var(--accent);">Move</button>
+        <button class="sm danger" id="btn-delete-selected" onclick="deleteSelectedItems()" disabled style="height:32px;border-color:rgba(255,100,100,0.5);color:rgba(255,140,140,0.9);background:transparent;">Delete</button>
+        <button class="sm" onclick="toggleSelectMode()" style="height:32px;color:rgba(255,255,255,0.6);border-color:rgba(255,255,255,0.2);background:transparent;">Cancel</button>
       </div>
     </div>
     <div class="search-wrap">
@@ -419,6 +419,26 @@ a:hover{text-decoration:underline;}
   </div>
 </div>
 
+<!-- Edit Log Entry Modal -->
+<div class="modal-bg" id="edit-log-modal" onclick="if(event.target===this)closeEditLogModal()">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Edit log entry</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.4" id="edit-log-item-info"></div>
+    <div class="field"><label>Quantity</label><input type="number" id="el-qty" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div class="form-row cols-2">
+      <div class="field"><label>Date</label><input type="date" id="el-date"></div>
+      <div class="field"><label>Supervisor</label><input type="text" id="el-super" placeholder="Name"></div>
+    </div>
+    <div class="field"><label>Notes</label><input type="text" id="el-notes" placeholder="e.g. Section B2, Sta 3+20"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="danger" style="margin-right:auto" id="btn-delete-log-entry" onclick="deleteLogEntry()">Delete entry</button>
+      <button onclick="closeEditLogModal()">Cancel</button>
+      <button class="primary" id="btn-save-log-entry" onclick="saveLogEntry()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Rename Group Modal -->
 <div class="modal-bg" id="rename-group-modal" onclick="if(event.target===this)closeRenameGroupModal()">
   <div class="modal" style="max-width:400px">
@@ -468,6 +488,7 @@ let activeDailyCat = 'All';
 let editingItemId = null;
 let dailyItemId = null;
 let renamingGroupName = null;
+let editingLogId = null;
 let selectMode = false;
 
 const CAT_COLORS = {
@@ -992,6 +1013,7 @@ function renderReport(){
                   <th style="width:80px;text-align:right">Qty today</th><th style="width:90px;text-align:right">Total to date</th>
                   <th style="width:70px;text-align:right">Tendered</th><th style="width:52px;text-align:right">% done</th>
                   <th style="width:90px;text-align:right">Value today</th><th>Notes</th>
+                  ${isSupervisorOrAdmin()?'<th class="no-print"></th>':''}
                 </tr></thead>
                 <tbody>${dayItems.map(d=>{
                   const it=items.find(i=>i.id===d.itemId);if(!it)return'';
@@ -999,15 +1021,16 @@ function renderReport(){
                   const notes=d.entries.map(e=>e.notes).filter(Boolean).join('; ');
                   const sups=[...new Set(d.entries.map(e=>e.supervisor_name).filter(Boolean))].join(', ');
                   return`<tr>
-                    <td style="font-weight:500">${it.item_number}</td>
+                    <td style="font-weight:600">${it.item_number}</td>
                     <td>${it.description}<br><span style="font-size:11px;color:var(--text2)">${sups}</span></td>
                     <td>${it.unit}</td>
-                    <td style="text-align:right;font-weight:500">${fmtN(d.totalQty)}</td>
+                    <td style="text-align:right;font-weight:600">${fmtN(d.totalQty)}</td>
                     <td style="text-align:right">${fmtN(totComp)}</td>
                     <td style="text-align:right">${fmtN(it.tendered_qty)}</td>
-                    <td style="text-align:right"><span style="font-weight:500;color:${pct>=100?'var(--success-text)':pct>50?'var(--blue)':'var(--text)'}">${pct}%</span></td>
+                    <td style="text-align:right"><span style="font-weight:600;color:${pct>=100?'var(--success-text)':pct>50?'var(--blue)':'var(--text)'}">${pct}%</span></td>
                     <td style="text-align:right">${fmtC(d.totalQty*it.unit_price)}</td>
                     <td style="font-size:12px;color:var(--text2)">${notes||'—'}</td>
+                    ${isSupervisorOrAdmin()?`<td class="no-print" style="white-space:nowrap">${d.entries.map(e=>`<button class="sm" style="font-size:11px;padding:3px 8px;margin-bottom:2px" onclick="openEditLogModal('${e.id}')">Edit${d.entries.length>1?' ('+fmtN(e.qty)+')':''}</button>`).join('')}</td>`:''}
                   </tr>`;
                 }).join('')}</tbody>
                 <tfoot><tr style="background:var(--bg2)">
@@ -1050,15 +1073,72 @@ function renderLog(){
   if(!entries.length){el.innerHTML='<div class="empty">No entries yet.</div>';return;}
   el.innerHTML=entries.slice(0,100).map(e=>{
     const it=items.find(i=>i.id===e.item_id);
-    return`<div class="log-entry"><div class="log-dot"></div><div style="flex:1">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        ${it?`<span class="badge-cat" style="${catStyle(getEffectiveGroupName(it))}">${getEffectiveGroupName(it)}</span>`:''}
-        <span style="font-weight:500;font-size:13px;flex:1">${it?it.item_number+' – '+it.description:'Unknown item'}</span>
-        <span class="badge badge-gray" style="flex-shrink:0">${fmtN(e.qty)} ${it?it.unit:''}</span>
+    return`<div class="log-entry">
+      <div class="log-dot"></div>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1">
+            ${it?`<span class="badge-cat" style="${catStyle(getEffectiveGroupName(it))}">${getEffectiveGroupName(it)}</span>`:''}
+            <span style="font-weight:600;font-size:13px;margin-left:2px">${it?it.item_number+' – '+it.description:'Unknown item'}</span>
+          </div>
+          <span class="badge badge-gray" style="flex-shrink:0;font-size:12px;font-weight:600">${fmtN(e.qty)} ${it?it.unit:''}</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:5px;gap:8px">
+          <div style="font-size:12px;color:var(--text2)">${fmtDate(e.entry_date)} · ${e.supervisor_name||'—'}${e.notes?` · <em>${e.notes}</em>`:''}</div>
+          ${isSupervisorOrAdmin()?`<button class="sm" style="flex-shrink:0;font-size:11px;padding:3px 9px" onclick="openEditLogModal('${e.id}')">Edit</button>`:''}
+        </div>
       </div>
-      <div style="font-size:12px;color:var(--text2);margin-top:3px">${fmtDate(e.entry_date)} · ${e.supervisor_name||'—'}${e.notes?' · '+e.notes:''}</div>
-    </div></div>`;
+    </div>`;
   }).join('');
+}
+
+// ── Edit log entry ─────────────────────────────────────────────────
+function openEditLogModal(entryId){
+  if(!isSupervisorOrAdmin()){toast('You do not have permission to edit entries');return;}
+  const e=logEntries.find(e=>e.id===entryId);if(!e)return;
+  const it=items.find(i=>i.id===e.item_id);
+  editingLogId=entryId;
+  document.getElementById('edit-log-item-info').textContent=(it?it.item_number+' — '+it.description:'Unknown item');
+  document.getElementById('el-qty').value=e.qty;
+  document.getElementById('el-date').value=e.entry_date;
+  document.getElementById('el-super').value=e.supervisor_name||'';
+  document.getElementById('el-notes').value=e.notes||'';
+  document.getElementById('edit-log-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('el-qty').focus(),300);
+}
+function closeEditLogModal(){document.getElementById('edit-log-modal').classList.remove('open');editingLogId=null;}
+
+async function saveLogEntry(){
+  const qty=parseFloat(document.getElementById('el-qty').value);
+  if(!qty||qty<=0){toast('Enter a valid quantity');return;}
+  const btn=document.getElementById('btn-save-log-entry');
+  btn.disabled=true;btn.textContent='Saving…';
+  const payload={
+    qty,
+    entry_date:document.getElementById('el-date').value,
+    supervisor_name:document.getElementById('el-super').value.trim(),
+    notes:document.getElementById('el-notes').value.trim(),
+  };
+  const {error}=await sb.from('log_entries').update(payload).eq('id',editingLogId);
+  btn.disabled=false;btn.textContent='Save';
+  if(error){toast('Error: '+error.message);return;}
+  await loadLog();
+  closeEditLogModal();
+  renderLog();renderItems();renderDailyList();
+  toast('Entry updated ✓');
+}
+
+async function deleteLogEntry(){
+  if(!confirm('Delete this log entry? This cannot be undone.'))return;
+  const btn=document.getElementById('btn-delete-log-entry');
+  btn.disabled=true;btn.textContent='Deleting…';
+  const {error}=await sb.from('log_entries').delete().eq('id',editingLogId);
+  btn.disabled=false;btn.textContent='Delete entry';
+  if(error){toast('Error: '+error.message);return;}
+  await loadLog();
+  closeEditLogModal();
+  renderLog();renderItems();renderDailyList();
+  toast('Entry deleted');
 }
 
 // ── Item modal ─────────────────────────────────────────────────────
