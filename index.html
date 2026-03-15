@@ -655,6 +655,7 @@ function renderItems(){
       <div style="display:flex;gap:6px">
         ${isSupervisorOrAdmin()?`<button class="sm primary" onclick="openDailyModal('${it.id}')" style="flex:1">+ Log</button>`:''}
         ${isAdmin()?`<button class="sm" onclick="openEditItem('${it.id}')" style="flex:1">Edit</button>`:''}
+        ${isAdmin()?`<button class="sm danger" onclick="deleteItem('${it.id}','${it.description.replace(/'/g,"\\'")}')">Delete</button>`:''}
       </div>
     </div>`;
   }).join('')}</div>`).join('');
@@ -902,6 +903,14 @@ async function saveItem(){
   btn.disabled=false;btn.textContent='Save';
   if(error){toast('Error: '+error.message);return;}
   await loadItems();closeModal();renderItems();updateLogFilters();toast('Item saved ✓');
+}
+
+async function deleteItem(id, desc){
+  if(!isAdmin()){toast('Only admins can delete items');return;}
+  if(!confirm(`Delete "${desc}"?\n\nThis will also delete all log entries for this item. This cannot be undone.`))return;
+  const {error}=await sb.from('items').delete().eq('id',id);
+  if(error){toast('Error: '+error.message);return;}
+  await loadItems();await loadLog();renderItems();updateLogFilters();renderDashboard();toast('Item deleted');
 }
 
 // ── CSV import ─────────────────────────────────────────────────────
