@@ -663,10 +663,28 @@ async function switchProject(id){
   projectId=id;
   const p=allProjects.find(p=>p.id===id);
   if(p) loadProjectFields(p);
+  // Reset all local state
   items=[];logEntries=[];groups=[];collapsedGroups=new Set();
-  await loadGroups();await loadItems();await loadLog();
-  updateLogFilters();renderGroupsList();populateGroupSelects();
-  renderDashboard();
+  // Show loading feedback
+  toast(`Loading ${p?.name}…`);
+  // Reload all data for new project
+  await loadGroups();
+  await loadItems();
+  await loadLog();
+  // Update all UI that depends on project data
+  updateLogFilters();
+  renderGroupsList();
+  populateGroupSelects();
+  // Re-render whichever page is currently active
+  const activePage=document.querySelector('.page.active')?.id?.replace('page-','');
+  if(activePage==='dashboard') renderDashboard();
+  else if(activePage==='items') renderItems();
+  else if(activePage==='daily') renderDailyPage();
+  else if(activePage==='report') renderReport();
+  else if(activePage==='log') renderLog();
+  else renderDashboard();
+  // Always refresh dashboard data silently too
+  if(activePage!=='dashboard') renderDashboard();
   toast(`Switched to: ${p?.name}`);
 }
 function openNewProjectModal(){
