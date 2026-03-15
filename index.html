@@ -256,6 +256,12 @@ a:hover{text-decoration:underline;}
       <div class="nav-brand-icon"><svg viewBox="0 0 24 24"><path d="M2 20h20v2H2v-2zm2-8h2v7H4v-7zm5 0h2v7H9v-7zm4 0h2v7h-2v-7zm5 0h2v7h-2v-7zM2 7l10-5 10 5v2H2V7zm10-3L5.17 7h13.66L12 4z"/></svg></div>
       <span class="nav-brand-text">FIELDTRACK</span>
     </div>
+    <div style="display:flex;align-items:center;border-right:1px solid var(--nav-border);padding:0;flex-shrink:0;">
+      <select id="project-switcher" onchange="switchProject(this.value)" style="background:transparent;color:var(--nav-text);border:none;font-size:13px;font-weight:500;padding:0 8px 0 14px;height:52px;cursor:pointer;max-width:180px;outline:none;border-radius:0;appearance:none;-webkit-appearance:none;">
+        <option value="">Loading…</option>
+      </select>
+      <button id="nav-add-project" onclick="openNewProjectModal()" style="display:none;background:transparent;border:none;color:var(--accent);font-size:22px;padding:0 12px 0 4px;height:52px;cursor:pointer;line-height:1;font-weight:300;" title="New project">+</button>
+    </div>
     <div class="nav-tab active" id="tab-dashboard" onclick="showPage('dashboard')">Dashboard</div>
     <div class="nav-tab" id="tab-items" onclick="showPage('items')">Items</div>
     <div class="nav-tab" id="tab-daily" onclick="showPage('daily')">Daily Entry</div>
@@ -479,6 +485,27 @@ a:hover{text-decoration:underline;}
   </div>
 </div>
 
+<!-- New Project Modal -->
+<div class="modal-bg" id="new-project-modal" onclick="if(event.target===this)closeNewProjectModal()">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="new-project-modal-title">New project</div>
+    <div class="field"><label>Project name</label><input type="text" id="np-name" placeholder="Main St. Reconstruction"></div>
+    <div class="form-row cols-2">
+      <div class="field"><label>Contract #</label><input type="text" id="np-contract" placeholder="2024-MU-001"></div>
+      <div class="field"><label>Contractor</label><input type="text" id="np-contractor" placeholder="Acme Construction"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="field"><label>Start date</label><input type="date" id="np-start"></div>
+      <div class="field"><label>End date</label><input type="date" id="np-end"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button style="flex:1" onclick="closeNewProjectModal()">Cancel</button>
+      <button class="primary" style="flex:1" id="btn-create-project" onclick="createNewProject()">Create project</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -488,7 +515,7 @@ const sb=supabase.createClient(SUPA_URL,SUPA_KEY);
 
 // ── State ──────────────────────────────────────────────────────────
 let currentUser=null,currentProfile=null,projectId=null;
-let items=[],logEntries=[],groups=[];
+let items=[],logEntries=[],groups=[],allProjects=[];
 let selectMode=false,editingItemId=null,dailyItemId=null;
 let renamingGroupName=null,editingLogId=null;
 let activeItemCat='All',activeDailyCat='All';
@@ -578,19 +605,18 @@ function applyRoleUI(){
   document.getElementById('nav-user-name').textContent=currentProfile?.full_name||currentUser?.email||'';
   if(!isSupervisorOrAdmin())document.getElementById('tab-daily').style.display='none';
   if(!isAdmin())document.getElementById('tab-setup').style.display='none';
+  const addProjBtn=document.getElementById('nav-add-project');
+  if(addProjBtn) addProjBtn.style.display=isAdmin()?'block':'none';
 }
 
 // ── Loaders ────────────────────────────────────────────────────────
 async function loadProject(){
-  const{data}=await sb.from('projects').select('*').order('created_at',{ascending:true}).limit(1);
-  if(data&&data.length){
-    const p=data[0];projectId=p.id;
-    document.getElementById('proj-name').value=p.name||'';
-    document.getElementById('proj-contract').value=p.contract_number||'';
-    document.getElementById('proj-contractor').value=p.contractor||'';
-    document.getElementById('proj-start').value=p.start_date||'';
-    document.getElementById('proj-end').value=p.end_date||'';
-  }
+  const{data}=await sb.from('projects').select('*').order('created_at',{ascending:true});
+  allProjects=data||[];
+  if(!projectId&&allProjects.length) projectId=allProjects[0].id;
+  const p=allProjects.find(p=>p.id===projectId);
+  if(p) loadProjectFields(p);
+  renderProjectSwitcher();
 }
 async function loadItems(){
   if(!projectId){items=[];return;}
@@ -616,6 +642,53 @@ async function loadUsers(){
   const el=document.getElementById('users-list');if(!el)return;
   el.innerHTML=data.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><div><div style="font-size:13px;font-weight:500">${u.full_name||'—'}</div>${u.id===currentUser.id?'<div style="font-size:12px;color:var(--text2)">(you)</div>':''}</div><span class="nav-role role-${u.role||'viewer'}" style="display:inline-flex;padding:2px 8px;">${u.role||'viewer'}</span></div>`).join('');
 }
+function loadProjectFields(p){
+  if(!p)return;
+  document.getElementById('proj-name').value=p.name||'';
+  document.getElementById('proj-contract').value=p.contract_number||'';
+  document.getElementById('proj-contractor').value=p.contractor||'';
+  document.getElementById('proj-start').value=p.start_date||'';
+  document.getElementById('proj-end').value=p.end_date||'';
+}
+function renderProjectSwitcher(){
+  const sel=document.getElementById('project-switcher');
+  if(!sel)return;
+  sel.innerHTML=allProjects.length
+    ? allProjects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')
+    : '<option value="">No projects yet</option>';
+  if(projectId) sel.value=projectId;
+}
+async function switchProject(id){
+  if(!id||id===projectId)return;
+  projectId=id;
+  const p=allProjects.find(p=>p.id===id);
+  if(p) loadProjectFields(p);
+  items=[];logEntries=[];groups=[];collapsedGroups=new Set();
+  await loadGroups();await loadItems();await loadLog();
+  updateLogFilters();renderGroupsList();populateGroupSelects();
+  renderDashboard();
+  toast(`Switched to: ${p?.name}`);
+}
+function openNewProjectModal(){
+  ['np-name','np-contract','np-contractor','np-start','np-end'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('new-project-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('np-name').focus(),200);
+}
+function closeNewProjectModal(){document.getElementById('new-project-modal').classList.remove('open');}
+async function createNewProject(){
+  if(!isAdmin()){toast('Only admins can create projects');return;}
+  const name=document.getElementById('np-name').value.trim();
+  if(!name){toast('Project name is required');return;}
+  const payload={name,contract_number:document.getElementById('np-contract').value.trim(),contractor:document.getElementById('np-contractor').value.trim(),start_date:document.getElementById('np-start').value||null,end_date:document.getElementById('np-end').value||null,created_by:currentUser.id};
+  const btn=document.getElementById('btn-create-project');btn.disabled=true;btn.textContent='Creating…';
+  const{data,error}=await sb.from('projects').insert(payload).select().single();
+  btn.disabled=false;btn.textContent='Create project';
+  if(error){toast('Error: '+error.message);return;}
+  allProjects.push(data);
+  closeNewProjectModal();
+  await switchProject(data.id);
+  toast(`"${name}" created ✓`);
+}
 
 // ── Nav ────────────────────────────────────────────────────────────
 function showPage(id){
@@ -637,8 +710,11 @@ async function saveProject(){
   if(!payload.name){toast('Project name is required');return;}
   let error;
   if(projectId){({error}=await sb.from('projects').update(payload).eq('id',projectId));}
-  else{const{data,error:e}=await sb.from('projects').insert({...payload,created_by:currentUser.id}).select().single();error=e;if(data)projectId=data.id;}
+  else{const{data,error:e}=await sb.from('projects').insert({...payload,created_by:currentUser.id}).select().single();error=e;if(data){projectId=data.id;allProjects.push(data);}}
   if(error){toast('Error: '+error.message);return;}
+  const idx=allProjects.findIndex(p=>p.id===projectId);
+  if(idx!==-1)allProjects[idx]={...allProjects[idx],...payload};
+  renderProjectSwitcher();
   toast('Project saved ✓');
 }
 
