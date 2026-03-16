@@ -294,7 +294,17 @@ body.theme-dark{
     <div class="nav-tab active" id="tab-dashboard" onclick="showPage('dashboard')">Dashboard</div>
     <div class="nav-tab" id="tab-items" onclick="showPage('items')">Items</div>
     <div class="nav-tab" id="tab-daily" onclick="showPage('daily')">Daily Entry</div>
-    <div class="nav-tab" id="tab-report" onclick="showPage('report')">Daily Report</div>
+    <div class="nav-tab" id="tab-report" style="position:relative;padding:0;" onmouseenter="showReportMenu()" onmouseleave="hideReportMenu()">
+      <div id="report-tab-label" style="padding:0 13px;height:52px;display:flex;align-items:center;gap:5px;cursor:pointer;" onclick="showPage('report');setReportType('daily')">
+        Reports
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div id="report-menu" style="display:none;position:absolute;top:52px;left:0;background:var(--nav-bg);border:1px solid var(--nav-border);border-radius:0 0 var(--r) var(--r);min-width:160px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.3);">
+        <div onclick="showPage('report');setReportType('daily');hideReportMenu()" style="padding:11px 16px;font-size:13px;color:var(--nav-text2);cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='rgba(255,255,255,0.06)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='var(--nav-text2)'">Daily report</div>
+        <div onclick="showPage('report');setReportType('weekly');hideReportMenu()" style="padding:11px 16px;font-size:13px;color:var(--nav-text2);cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='rgba(255,255,255,0.06)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='var(--nav-text2)'">Weekly report</div>
+        <div onclick="showPage('report');setReportType('monthly');hideReportMenu()" style="padding:11px 16px;font-size:13px;color:var(--nav-text2);cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='rgba(255,255,255,0.06)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='var(--nav-text2)'">Monthly report</div>
+      </div>
+    </div>
     <div class="nav-tab" id="tab-log" onclick="showPage('log')">Log</div>
     <div class="nav-tab" id="tab-setup" onclick="showPage('setup')">Setup</div>
     <div class="nav-user">
@@ -350,12 +360,19 @@ body.theme-dark{
     <div id="daily-items-list"></div>
   </div>
 
-  <!-- DAILY REPORT -->
+  <!-- REPORTS -->
   <div id="page-report" class="page">
     <div class="sec-header no-print">
-      <div class="sec-title">Daily report</div>
+      <div id="report-title-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="sec-title" id="report-page-title">Daily report</div>
+        <div style="display:flex;gap:6px;">
+          <button id="rtype-daily" class="sm primary" onclick="setReportType('daily')" style="font-size:12px;">Daily</button>
+          <button id="rtype-weekly" class="sm" onclick="setReportType('weekly')" style="font-size:12px;">Weekly</button>
+          <button id="rtype-monthly" class="sm" onclick="setReportType('monthly')" style="font-size:12px;">Monthly</button>
+        </div>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="date" id="report-date" style="width:160px" onchange="renderReport()">
+        <div id="report-date-controls" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>
         <button class="primary" onclick="window.print()">Print / Save PDF</button>
       </div>
     </div>
@@ -776,7 +793,7 @@ function showPage(id){
   if(id==='dashboard')renderDashboard();
   if(id==='items')renderItems();
   if(id==='daily')renderDailyPage();
-  if(id==='report')renderReport();
+  if(id==='report'){setReportType(activeReportType);}
   if(id==='log'){updateLogFilters();renderLog();}
 }
 
@@ -1247,19 +1264,69 @@ async function deleteLogEntry(){
   closeEditLogModal();renderDailyList();renderItems();renderLog();toast('Entry deleted');
 }
 
-// ── Daily report ───────────────────────────────────────────────────
-function renderReport(){
-  const rdEl=document.getElementById('report-date');if(!rdEl.value)rdEl.value=today();
-  const reportDate=rdEl.value;
+// ── Reports ────────────────────────────────────────────────────────
+let activeReportType='daily';
+
+function showReportMenu(){document.getElementById('report-menu').style.display='block';}
+function hideReportMenu(){setTimeout(()=>document.getElementById('report-menu').style.display='none',150);}
+
+function setReportType(type){
+  activeReportType=type;
+  const titles={daily:'Daily report',weekly:'Weekly report',monthly:'Monthly report'};
+  document.getElementById('report-page-title').textContent=titles[type];
+  // Update active button
+  ['daily','weekly','monthly'].forEach(t=>{
+    const btn=document.getElementById('rtype-'+t);
+    if(btn){btn.className=t===type?'sm primary':'sm';}
+  });
+  // Build date controls
+  const ctrl=document.getElementById('report-date-controls');
+  if(type==='daily'){
+    ctrl.innerHTML=`<input type="date" id="report-date" style="width:160px" onchange="renderReport()" value="${today()}">`;
+  } else if(type==='weekly'){
+    // Week picker — show Monday of current week
+    const mon=getMondayOfWeek(today());
+    ctrl.innerHTML=`<label style="font-size:12px;color:var(--text2);margin-bottom:0;">Week of</label><input type="date" id="report-week" style="width:160px" onchange="renderReport()" value="${mon}">`;
+  } else {
+    const ym=today().slice(0,7);
+    ctrl.innerHTML=`<input type="month" id="report-month" style="width:140px" onchange="renderReport()" value="${ym}">`;
+  }
+  renderReport();
+}
+
+function getMondayOfWeek(dateStr){
+  const d=new Date(dateStr+'T12:00:00');
+  const day=d.getDay();
+  const diff=day===0?-6:1-day;
+  d.setDate(d.getDate()+diff);
+  return d.toISOString().slice(0,10);
+}
+function getSundayOfWeek(mondayStr){
+  const d=new Date(mondayStr+'T12:00:00');
+  d.setDate(d.getDate()+6);
+  return d.toISOString().slice(0,10);
+}
+function getDatesInRange(start,end){
+  const dates=[];const d=new Date(start+'T12:00:00');const e=new Date(end+'T12:00:00');
+  while(d<=e){dates.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}
+  return dates;
+}
+function fmtMonthLong(ym){
+  const d=new Date(ym+'-01T12:00:00');
+  return d.toLocaleDateString('en-CA',{year:'numeric',month:'long'});
+}
+
+function buildReportHTML(periodLabel, periodType, rangeEntries, periodStart, periodEnd){
   const el=document.getElementById('report-content');
-  const dayEntries=logEntries.filter(e=>e.entry_date===reportDate);
   if(!items.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div style="font-weight:600">No contract loaded</div></div>`;return;}
-  if(!dayEntries.length){el.innerHTML=`<div class="card" style="text-align:center;padding:32px 20px"><div style="font-size:28px;margin-bottom:10px">📄</div><div style="font-weight:600;margin-bottom:6px">No entries for ${fmtDateLong(reportDate)}</div><div style="font-size:13px;color:var(--text2);margin-bottom:16px">Log quantities for this date to generate a report.</div>${isSupervisorOrAdmin()?'<button onclick="showPage(\'daily\')">Go to Daily Entry →</button>':''}</div>`;return;}
+  if(!rangeEntries.length){
+    el.innerHTML=`<div class="card" style="text-align:center;padding:32px 20px"><div style="font-size:28px;margin-bottom:10px">📄</div><div style="font-weight:600;margin-bottom:6px">No entries for ${periodLabel}</div><div style="font-size:13px;color:var(--text2);margin-bottom:16px">Log quantities for this period to generate a report.</div>${isSupervisorOrAdmin()?'<button onclick="showPage(\'daily\')">Go to Daily Entry →</button>':''}</div>`;
+    return;
+  }
   const itemMap={};
-  dayEntries.forEach(e=>{if(!itemMap[e.item_id])itemMap[e.item_id]={itemId:e.item_id,totalQty:0,entries:[]};itemMap[e.item_id].totalQty+=Number(e.qty);itemMap[e.item_id].entries.push(e);});
-  const supers=[...new Set(dayEntries.map(e=>e.supervisor_name).filter(Boolean))];
-  const dayValue=Object.values(itemMap).reduce((s,d)=>{const it=items.find(i=>i.id===d.itemId);return s+(it?d.totalQty*it.unit_price:0);},0);
-  const catsToday=[...new Set(Object.values(itemMap).map(d=>{const it=items.find(i=>i.id===d.itemId);return it?getEffectiveGroupName(it):'Ungrouped';}))].sort();
+  rangeEntries.forEach(e=>{if(!itemMap[e.item_id])itemMap[e.item_id]={itemId:e.item_id,totalQty:0,entries:[]};itemMap[e.item_id].totalQty+=Number(e.qty);itemMap[e.item_id].entries.push(e);});
+  const supers=[...new Set(rangeEntries.map(e=>e.supervisor_name).filter(Boolean))];
+  const periodValue=Object.values(itemMap).reduce((s,d)=>{const it=items.find(i=>i.id===d.itemId);return s+(it?d.totalQty*it.unit_price:0);},0);
   const grouped={};
   Object.values(itemMap).forEach(d=>{const it=items.find(i=>i.id===d.itemId);const cat=it?getEffectiveGroupName(it):'Ungrouped';if(!grouped[cat])grouped[cat]=[];grouped[cat].push(d);});
   Object.values(grouped).forEach(arr=>arr.sort((a,b)=>{const ia=items.find(i=>i.id===a.itemId);const ib=items.find(i=>i.id===b.itemId);return(ia?.item_number||'').localeCompare(ib?.item_number||'',undefined,{numeric:true,sensitivity:'base'});}));
@@ -1269,48 +1336,61 @@ function renderReport(){
   const projName=document.getElementById('proj-name').value||'Construction Project';
   const contract=document.getElementById('proj-contract').value;
   const contractor=document.getElementById('proj-contractor').value;
+  const periodTypeLabel={daily:'Daily report',weekly:'Weekly report',monthly:'Monthly report'}[periodType];
+  const qtyColLabel={daily:'Qty this day',weekly:'Qty this week',monthly:'Qty this month'}[periodType];
+
   el.innerHTML=`<div class="report-wrap">
     <div class="report-header">
       <div class="report-header-accent"></div>
       <div class="report-header-project">${projName}</div>
       <div class="report-header-meta">${[contract,contractor].filter(Boolean).join(' · ')}</div>
       <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:14px;flex-wrap:wrap;gap:8px">
-        <div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,0.4)">Daily report</div><div style="font-size:20px;font-weight:700;color:#fff;margin-top:3px;letter-spacing:-.3px">${fmtDateLong(reportDate)}</div></div>
-        <div style="text-align:right"><div style="font-size:11px;color:rgba(255,255,255,0.4);font-weight:500">Contract progress</div><div style="font-size:26px;font-weight:700;color:var(--accent);letter-spacing:-.5px">${op}%</div><div style="font-size:12px;color:rgba(255,255,255,0.5)">${fmtC(te)} of ${fmtC(tc)}</div></div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,0.4)">${periodTypeLabel}</div>
+          <div style="font-size:20px;font-weight:700;color:#fff;margin-top:3px;letter-spacing:-.3px">${periodLabel}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);font-weight:500">Contract progress</div>
+          <div style="font-size:26px;font-weight:700;color:var(--accent);letter-spacing:-.5px">${op}%</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5)">${fmtC(te)} of ${fmtC(tc)}</div>
+        </div>
       </div>
     </div>
     <div class="report-section">
-      <div class="report-section-title">Day summary</div>
+      <div class="report-section-title">Period summary</div>
       <div class="report-stat-row">
         <div class="report-stat"><div class="report-stat-val">${Object.keys(itemMap).length}</div><div class="report-stat-lbl">Items worked</div></div>
-        <div class="report-stat"><div class="report-stat-val">${dayEntries.length}</div><div class="report-stat-lbl">Log entries</div></div>
+        <div class="report-stat"><div class="report-stat-val">${rangeEntries.length}</div><div class="report-stat-lbl">Log entries</div></div>
         <div class="report-stat"><div class="report-stat-val">${supers.length}</div><div class="report-stat-lbl">Supervisors</div></div>
-        <div class="report-stat"><div class="report-stat-val">${fmtC(dayValue)}</div><div class="report-stat-lbl">Value installed</div></div>
+        <div class="report-stat"><div class="report-stat-val">${fmtC(periodValue)}</div><div class="report-stat-lbl">Value installed</div></div>
       </div>
       <div style="font-size:13px;margin-bottom:4px"><span style="color:var(--text2);font-size:12px">Supervisors: </span>${supers.join(', ')||'—'}</div>
-      <div style="font-size:13px"><span style="color:var(--text2);font-size:12px">Groups: </span>${catsToday.map(c=>`<span class="badge-cat" style="${catStyle(c)}">${c}</span>`).join(' ')}</div>
     </div>
     <div class="report-section">
-      <div class="report-section-title">Work completed today</div>
-      ${Object.entries(grouped).map(([cat,dayItems])=>`
+      <div class="report-section-title">Work completed</div>
+      ${Object.entries(grouped).map(([cat,catItems])=>`
         <div style="margin-bottom:16px">
           <div style="margin-bottom:8px"><span class="badge-cat" style="${catStyle(cat)}">${cat}</span></div>
           <div class="report-tbl-wrap"><table class="report-tbl">
             <thead><tr>
-              <th style="width:60px">Item #</th><th>Description</th><th style="width:50px">Unit</th>
-              <th style="width:80px;text-align:right">Qty today</th><th style="width:90px;text-align:right">Total to date</th>
-              <th style="width:70px;text-align:right">Tendered</th><th style="width:52px;text-align:right">% done</th>
-              <th style="width:90px;text-align:right">Value today</th><th>Notes</th>
-              ${isSupervisorOrAdmin()?'<th class="no-print"></th>':''}
+              <th style="width:60px">Item #</th>
+              <th>Description</th>
+              <th style="width:50px">Unit</th>
+              <th style="width:90px;text-align:right">${qtyColLabel}</th>
+              <th style="width:90px;text-align:right">Total to date</th>
+              <th style="width:70px;text-align:right">Tendered</th>
+              <th style="width:52px;text-align:right">% done</th>
+              <th style="width:100px;text-align:right">Value</th>
+              <th>Notes</th>
             </tr></thead>
-            <tbody>${dayItems.map(d=>{
+            <tbody>${catItems.map(d=>{
               const it=items.find(i=>i.id===d.itemId);if(!it)return'';
               const totComp=getCompleted(it);const pct=getPct(it);
-              const notes=d.entries.map(e=>e.notes).filter(Boolean).join('; ');
-              const sups=[...new Set(d.entries.map(e=>e.supervisor_name).filter(Boolean))].join(', ');
+              const notes=[...new Set(d.entries.map(e=>e.notes).filter(Boolean))].join('; ');
+              const entrySups=[...new Set(d.entries.map(e=>e.supervisor_name).filter(Boolean))].join(', ');
               return`<tr>
                 <td style="font-weight:600">${it.item_number}</td>
-                <td>${it.description}<br><span style="font-size:11px;color:var(--text2)">${sups}</span></td>
+                <td>${it.description}<br><span style="font-size:11px;color:var(--text2)">${entrySups}</span></td>
                 <td>${it.unit}</td>
                 <td style="text-align:right;font-weight:600">${fmtN(d.totalQty)}</td>
                 <td style="text-align:right">${fmtN(totComp)}</td>
@@ -1318,18 +1398,20 @@ function renderReport(){
                 <td style="text-align:right"><span style="font-weight:600;color:${pct>=100?'var(--success-text)':pct>50?'var(--blue)':'var(--text)'}">${pct}%</span></td>
                 <td style="text-align:right">${fmtC(d.totalQty*it.unit_price)}</td>
                 <td style="font-size:12px;color:var(--text2)">${notes||'—'}</td>
-                ${isSupervisorOrAdmin()?`<td class="no-print" style="white-space:nowrap">${d.entries.map(e=>`<button class="sm" style="font-size:11px;padding:3px 8px;margin-bottom:2px" onclick="openEditLogModal('${e.id}')">Edit${d.entries.length>1?' ('+fmtN(e.qty)+')':''}</button>`).join('')}</td>`:''}
               </tr>`;
             }).join('')}</tbody>
             <tfoot><tr style="background:var(--bg2)">
-              <td colspan="${isSupervisorOrAdmin()?8:7}" style="font-weight:600;padding:8px;font-size:12px">Subtotal</td>
-              <td style="text-align:right;font-weight:600;padding:8px">${fmtC(dayItems.reduce((s,d)=>{const it=items.find(i=>i.id===d.itemId);return s+(it?d.totalQty*it.unit_price:0);},0))}</td>
-              ${isSupervisorOrAdmin()?'<td class="no-print"></td>':''}
+              <td colspan="7" style="font-weight:600;padding:8px;font-size:12px">Subtotal</td>
+              <td style="text-align:right;font-weight:600;padding:8px">${fmtC(catItems.reduce((s,d)=>{const it=items.find(i=>i.id===d.itemId);return s+(it?d.totalQty*it.unit_price:0);},0))}</td>
+              <td></td>
             </tr></tfoot>
           </table></div>
         </div>`).join('')}
       <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
-        <div style="text-align:right"><div style="font-size:12px;color:var(--text2);margin-bottom:2px">Total value installed today</div><div style="font-size:20px;font-weight:700;letter-spacing:-.3px">${fmtC(dayValue)}</div></div>
+        <div style="text-align:right">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:2px">Total value installed</div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:-.3px">${fmtC(periodValue)}</div>
+        </div>
       </div>
     </div>
     <div class="report-section">
@@ -1340,6 +1422,35 @@ function renderReport(){
       </div>
     </div>
   </div>`;
+}
+
+function renderReport(){
+  if(activeReportType==='daily'){
+    const dateEl=document.getElementById('report-date');
+    if(!dateEl){setReportType('daily');return;}
+    if(!dateEl.value) dateEl.value=today();
+    const d=dateEl.value;
+    const entries=logEntries.filter(e=>e.entry_date===d);
+    buildReportHTML(fmtDateLong(d),'daily',entries,d,d);
+  } else if(activeReportType==='weekly'){
+    const weekEl=document.getElementById('report-week');
+    if(!weekEl){setReportType('weekly');return;}
+    if(!weekEl.value) weekEl.value=getMondayOfWeek(today());
+    const mon=getMondayOfWeek(weekEl.value);
+    const sun=getSundayOfWeek(mon);
+    const entries=logEntries.filter(e=>e.entry_date>=mon&&e.entry_date<=sun);
+    const label=`${fmtDate(mon)} – ${fmtDate(sun)}`;
+    buildReportHTML(label,'weekly',entries,mon,sun);
+  } else {
+    const monthEl=document.getElementById('report-month');
+    if(!monthEl){setReportType('monthly');return;}
+    if(!monthEl.value) monthEl.value=today().slice(0,7);
+    const ym=monthEl.value;
+    const start=ym+'-01';
+    const end=new Date(new Date(start+'T12:00:00').getFullYear(),new Date(start+'T12:00:00').getMonth()+1,0).toISOString().slice(0,10);
+    const entries=logEntries.filter(e=>e.entry_date>=start&&e.entry_date<=end);
+    buildReportHTML(fmtMonthLong(ym),'monthly',entries,start,end);
+  }
 }
 
 // ── Log page ───────────────────────────────────────────────────────
