@@ -448,10 +448,31 @@ body.theme-dark{
     </div>
 
     <div class="card">
-      <div class="sec-title" style="margin-bottom:4px">Team & roles</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">In Supabase → Table Editor → profiles, set the <code style="font-family:var(--mono)">role</code> column to <code style="font-family:var(--mono)">admin</code> (Project Manager), <code style="font-family:var(--mono)">supervisor</code> (Project Superintendent / Coordinator), or <code style="font-family:var(--mono)">viewer</code> (Director).</div>
+      <div class="sec-header" style="margin-bottom:14px">
+        <div>
+          <div class="sec-title">Team & permissions</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">Assign roles to control what each team member can do.</div>
+        </div>
+        <button class="sm" onclick="loadUsers()">Refresh</button>
+      </div>
+
+      <!-- Role legend -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+        <div style="padding:10px 12px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Project Manager</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5">Full access — manage contract, items, groups, documents, team</div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--nav-text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Superintendent</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5">Log quantities, view reports, activity log, documents</div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Director</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5">Read-only — dashboard, reports, documents</div>
+        </div>
+      </div>
+
       <div id="users-list"></div>
-      <button class="block" style="margin-top:8px" onclick="loadUsers()">Refresh users</button>
     </div>
   </div>
 </div>
@@ -775,7 +796,44 @@ async function loadUsers(){
   const{data}=await sb.from('profiles').select('*').order('full_name');
   if(!data)return;
   const el=document.getElementById('users-list');if(!el)return;
-  el.innerHTML=data.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><div><div style="font-size:13px;font-weight:500">${u.full_name||'—'}</div>${u.id===currentUser.id?'<div style="font-size:12px;color:var(--text2)">(you)</div>':''}</div><span class="nav-role role-${u.role||'viewer'}" style="display:inline-flex;padding:2px 8px;">${roleDisplayName(u.role)}</span></div>`).join('');
+  if(!data.length){
+    el.innerHTML='<div style="font-size:13px;color:var(--text2);padding:8px 0">No team members found. Users appear here after they sign in for the first time.</div>';
+    return;
+  }
+  const canEdit=isAdmin();
+  el.innerHTML=`
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden;">
+      <div style="display:grid;grid-template-columns:1fr 1fr ${canEdit?'120px':'auto'};background:var(--bg2);border-bottom:1px solid var(--border);padding:8px 14px;gap:12px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Name / Email</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Role</div>
+        ${canEdit?'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Action</div>':''}
+      </div>
+      ${data.map(u=>{
+        const isSelf=u.id===currentUser.id;
+        const roleOptions=[
+          {value:'admin',label:'Project Manager'},
+          {value:'supervisor',label:'Project Superintendent'},
+          {value:'viewer',label:'Director'},
+        ];
+        return`<div style="display:grid;grid-template-columns:1fr 1fr ${canEdit?'120px':'auto'};align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:12px;" id="user-row-${u.id}">
+          <div>
+            <div style="font-size:13px;font-weight:600">${u.full_name||'—'} ${isSelf?'<span style="font-size:11px;color:var(--text3)">(you)</span>':''}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:1px">${u.id}</div>
+          </div>
+          <div>
+            ${canEdit&&!isSelf
+              ?`<select id="role-select-${u.id}" style="font-size:13px;padding:5px 28px 5px 8px;height:32px;" onchange="updateUserRole('${u.id}',this.value)">
+                  ${roleOptions.map(o=>`<option value="${o.value}"${u.role===o.value?' selected':''}>${o.label}</option>`).join('')}
+                </select>`
+              :`<span class="nav-role role-${u.role||'viewer'}" style="display:inline-flex;padding:3px 10px;">${roleDisplayName(u.role)}</span>`
+            }
+          </div>
+          ${canEdit?`<div id="user-status-${u.id}" style="font-size:12px;color:var(--text2)"></div>`:''}
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-top:10px">New users appear here after signing in for the first time. Share the app URL and have them sign up.</div>
+  `;
 }
 function loadProjectFields(p){
   if(!p)return;
@@ -844,7 +902,23 @@ async function createNewProject(){
   toast(`"${name}" created ✓`);
 }
 
-// ── Nav ────────────────────────────────────────────────────────────
+async function updateUserRole(userId, newRole){
+  if(!isAdmin()){toast('Only Project Managers can change roles');return;}
+  const statusEl=document.getElementById('user-status-'+userId);
+  if(statusEl) statusEl.textContent='Saving…';
+  const{error}=await sb.from('profiles').update({role:newRole}).eq('id',userId);
+  if(error){
+    toast('Error: '+error.message);
+    if(statusEl) statusEl.textContent='Failed';
+    return;
+  }
+  if(statusEl){
+    statusEl.textContent='Saved ✓';
+    statusEl.style.color='var(--success-text)';
+    setTimeout(()=>{statusEl.textContent='';statusEl.style.color='';},2000);
+  }
+  toast(`Role updated to ${roleDisplayName(newRole)} ✓`);
+}
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
