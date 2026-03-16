@@ -670,6 +670,7 @@ let currentUser=null,currentProfile=null,projectId=null;
 let items=[],logEntries=[],groups=[],allProjects=[];
 let selectMode=false,editingItemId=null,dailyItemId=null;
 let renamingGroupName=null,editingLogId=null,editingPhotoUrl=null;
+let selectedItems=new Set();
 let activeItemCat='All',activeDailyCat='All',activeDocCat='All';
 let documents=[];
 let collapsedGroups=new Set();
@@ -1132,8 +1133,23 @@ function renderItems(){
       </div>
     </div>`;
   }).join('');
+  // Reapply selections from Set after DOM rebuild
+  if(selectMode){
+    selectedItems.forEach(id=>{
+      const card=document.getElementById('card-'+id);
+      const indicator=document.getElementById('sel-indicator-'+id);
+      if(card){
+        card.classList.add('selected');
+        if(indicator){
+          indicator.style.background='var(--accent)';
+          indicator.style.borderColor='var(--accent)';
+          indicator.innerHTML=`<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        }
+      }
+    });
+    updateSelectionCount();
+  }
 }
-function setItemCat(cat){activeItemCat=cat;renderItems();}
 function toggleGroupCollapse(cat){if(collapsedGroups.has(cat))collapsedGroups.delete(cat);else collapsedGroups.add(cat);renderItems();}
 function toggleDailyGroupCollapse(cat){const key='daily-'+cat;if(collapsedGroups.has(key))collapsedGroups.delete(key);else collapsedGroups.add(key);renderDailyList();}
 
@@ -1141,6 +1157,7 @@ function toggleDailyGroupCollapse(cat){const key='daily-'+cat;if(collapsedGroups
 function toggleSelectMode(){
   if(!isAdmin()){toast('Only Project Managers can select items');return;}
   selectMode=!selectMode;
+  if(!selectMode) selectedItems.clear();
   const toolbar=document.getElementById('select-toolbar');
   const btn=document.getElementById('btn-select-mode');
   toolbar.style.display=selectMode?'flex':'none';
@@ -1156,7 +1173,10 @@ function toggleCardSelect(id){
   const card=document.getElementById('card-'+id);
   const indicator=document.getElementById('sel-indicator-'+id);
   if(!card)return;
-  const isSelected=card.classList.toggle('selected');
+  const isSelected=!selectedItems.has(id);
+  if(isSelected) selectedItems.add(id);
+  else selectedItems.delete(id);
+  card.classList.toggle('selected',isSelected);
   if(indicator){
     indicator.style.background=isSelected?'var(--accent)':'transparent';
     indicator.style.borderColor=isSelected?'var(--accent)':'var(--border2)';
@@ -1165,9 +1185,8 @@ function toggleCardSelect(id){
   updateSelectionCount();
 }
 function updateSelectionCount(){
-  const selected=document.querySelectorAll('.item-card.selected');
-  const total=document.querySelectorAll('[id^="card-"]').length;
-  const count=selected.length;
+  const count=selectedItems.size;
+  const total=items.length;
   document.getElementById('select-count').textContent=count===0?'Tap items to select':`${count} item${count!==1?'s':''} selected`;
   document.getElementById('btn-delete-selected').disabled=count===0;
   document.getElementById('btn-move-to-group').disabled=count===0;
@@ -1175,18 +1194,18 @@ function updateSelectionCount(){
   if(allChk){allChk.checked=count===total&&total>0;allChk.indeterminate=count>0&&count<total;}
 }
 function toggleSelectAll(checked){
-  document.querySelectorAll('[id^="card-"]').forEach(card=>{
-    const id=card.id.replace('card-','');
-    if(checked&&!card.classList.contains('selected'))toggleCardSelect(id);
-    else if(!checked&&card.classList.contains('selected'))toggleCardSelect(id);
-  });
+  if(checked){
+    items.forEach(it=>selectedItems.add(it.id));
+  } else {
+    selectedItems.clear();
+  }
+  renderItems();
 }
 async function moveSelectedToGroup(){
   const groupId=document.getElementById('move-to-group-select').value;
   if(!groupId){toast('Select a group first');return;}
-  const selected=[...document.querySelectorAll('.item-card.selected')];
-  if(!selected.length){toast('No items selected');return;}
-  const ids=selected.map(c=>c.id.replace('card-',''));
+  if(!selectedItems.size){toast('No items selected');return;}
+  const ids=[...selectedItems];
   const group=groups.find(g=>g.id===groupId);
   const btn=document.getElementById('btn-move-to-group');
   btn.disabled=true;btn.textContent='Moving…';
@@ -1197,9 +1216,8 @@ async function moveSelectedToGroup(){
   toast(`${ids.length} item${ids.length!==1?'s':''} moved to "${group?.name}" ✓`);
 }
 async function deleteSelectedItems(){
-  const selected=[...document.querySelectorAll('.item-card.selected')];
-  if(!selected.length)return;
-  const ids=selected.map(c=>c.id.replace('card-',''));
+  if(!selectedItems.size)return;
+  const ids=[...selectedItems];
   const names=ids.map(id=>{const it=items.find(i=>i.id===id);return it?it.item_number+' '+it.description:'item';});
   if(!confirm(`Delete ${ids.length} item${ids.length!==1?'s':''}?\n\n${names.slice(0,5).join('\n')}${names.length>5?`\n…and ${names.length-5} more`:''}\n\nAll log entries will also be deleted.`))return;
   const btn=document.getElementById('btn-delete-selected');
