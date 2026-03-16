@@ -306,6 +306,7 @@ body.theme-dark{
       </div>
     </div>
     <div class="nav-tab" id="tab-log" onclick="showPage('log')">Log</div>
+    <div class="nav-tab" id="tab-docs" onclick="showPage('docs')">Documents</div>
     <div class="nav-tab" id="tab-setup" onclick="showPage('setup')">Setup</div>
     <div class="nav-user">
       <span class="nav-role" id="nav-role-badge"></span>
@@ -385,6 +386,16 @@ body.theme-dark{
       <div><select id="log-filter-super" onchange="renderLog()"><option value="">All supervisors</option></select></div>
     </div>
     <div class="card" id="log-container"></div>
+  </div>
+
+  <!-- DOCUMENTS -->
+  <div id="page-docs" class="page">
+    <div class="sec-header">
+      <div class="sec-title">Documents</div>
+      <button id="btn-upload-doc" class="primary" onclick="openUploadDocModal()" style="display:none">+ Upload</button>
+    </div>
+    <div class="filter-row" id="doc-cat-filters"></div>
+    <div id="docs-list"></div>
   </div>
 
   <!-- SETUP -->
@@ -583,6 +594,46 @@ body.theme-dark{
   </div>
 </div>
 
+<!-- Upload Document Modal -->
+<div class="modal-bg" id="upload-doc-modal" onclick="if(event.target===this)closeUploadDocModal()">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Upload document</div>
+    <div class="field"><label>Document name</label><input type="text" id="doc-name" placeholder="e.g. Site Plan Rev 3"></div>
+    <div class="field">
+      <label>Category</label>
+      <select id="doc-category">
+        <option value="Contract Drawings">Contract Drawings</option>
+        <option value="Safety Documents">Safety Documents</option>
+        <option value="Permits">Permits</option>
+        <option value="Specifications">Specifications</option>
+        <option value="Site Instructions">Site Instructions</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>File</label>
+      <div id="doc-file-preview" style="display:none;padding:10px 12px;background:var(--bg2);border-radius:var(--r);margin-bottom:8px;display:none;align-items:center;justify-content:space-between;gap:8px;">
+        <div>
+          <div id="doc-file-name" style="font-size:13px;font-weight:500"></div>
+          <div id="doc-file-size" style="font-size:12px;color:var(--text2)"></div>
+        </div>
+        <button class="sm" onclick="clearDocFile()" style="flex-shrink:0">Remove</button>
+      </div>
+      <div id="doc-file-zone" onclick="document.getElementById('doc-file-input').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+        <div style="font-size:24px;margin-bottom:6px">📎</div>
+        <div style="font-size:13px;font-weight:500;margin-bottom:2px">Tap to select a file</div>
+        <div style="font-size:12px;color:var(--text2)">PDF, images, or any file type</div>
+        <input type="file" id="doc-file-input" style="display:none" onchange="previewDocFile(this)">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button style="flex:1" onclick="closeUploadDocModal()">Cancel</button>
+      <button class="primary" style="flex:1" id="btn-upload-doc-submit" onclick="submitUploadDoc()">Upload</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -595,7 +646,8 @@ let currentUser=null,currentProfile=null,projectId=null;
 let items=[],logEntries=[],groups=[],allProjects=[];
 let selectMode=false,editingItemId=null,dailyItemId=null;
 let renamingGroupName=null,editingLogId=null,editingPhotoUrl=null;
-let activeItemCat='All',activeDailyCat='All';
+let activeItemCat='All',activeDailyCat='All',activeDocCat='All';
+let documents=[];
 let collapsedGroups=new Set();
 let mappingRows=[],mappingHeaders=[];
 
@@ -660,6 +712,7 @@ async function bootstrap(){
     await loadGroups();
     await loadItems();
     await loadLog();
+    await loadDocuments();
     document.getElementById('loading-screen').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('entry-date').value=today();
@@ -683,6 +736,8 @@ function applyRoleUI(){
   if(!isAdmin())document.getElementById('tab-setup').style.display='none';
   const addProjBtn=document.getElementById('nav-add-project');
   if(addProjBtn) addProjBtn.style.display=isAdmin()?'block':'none';
+  const uploadDocBtn=document.getElementById('btn-upload-doc');
+  if(uploadDocBtn) uploadDocBtn.style.display=isAdmin()?'':'none';
 }
 
 // ── Loaders ────────────────────────────────────────────────────────
@@ -740,13 +795,14 @@ async function switchProject(id){
   const p=allProjects.find(p=>p.id===id);
   if(p) loadProjectFields(p);
   // Reset all local state
-  items=[];logEntries=[];groups=[];collapsedGroups=new Set();
+  items=[];logEntries=[];groups=[];documents=[];collapsedGroups=new Set();
   // Show loading feedback
   toast(`Loading ${p?.name}…`);
   // Reload all data for new project
   await loadGroups();
   await loadItems();
   await loadLog();
+  await loadDocuments();
   // Update all UI that depends on project data
   updateLogFilters();
   renderGroupsList();
@@ -795,6 +851,7 @@ function showPage(id){
   if(id==='daily')renderDailyPage();
   if(id==='report'){setReportType(activeReportType);}
   if(id==='log'){updateLogFilters();renderLog();}
+  if(id==='docs')renderDocs();
 }
 
 // ── Project ────────────────────────────────────────────────────────
@@ -1532,6 +1589,131 @@ function renderLog(){
       ${e.photo_url?`<a href="${e.photo_url}" target="_blank" style="display:block;margin-top:8px;"><img src="${e.photo_url}" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border);"></a>`:''}
     </div></div>`;
   }).join('');
+}
+
+// ── Documents ──────────────────────────────────────────────────────
+const DOC_CATEGORIES=['Contract Drawings','Safety Documents','Permits','Specifications','Site Instructions','Other'];
+
+function fmtFileSize(bytes){
+  if(!bytes)return'';
+  if(bytes<1024)return bytes+'B';
+  if(bytes<1024*1024)return Math.round(bytes/1024)+'KB';
+  return(bytes/(1024*1024)).toFixed(1)+'MB';
+}
+function docIcon(fileType){
+  if(!fileType)return'📄';
+  if(fileType.includes('pdf'))return'📕';
+  if(fileType.includes('image'))return'🖼️';
+  if(fileType.includes('word')||fileType.includes('doc'))return'📝';
+  if(fileType.includes('sheet')||fileType.includes('excel')||fileType.includes('csv'))return'📊';
+  return'📄';
+}
+
+async function loadDocuments(){
+  if(!projectId){documents=[];return;}
+  try{
+    const{data,error}=await sb.from('documents').select('*').eq('project_id',projectId).order('created_at',{ascending:false});
+    if(error){console.warn('documents table error:',error.message);documents=[];return;}
+    documents=data||[];
+  }catch(e){console.warn('loadDocuments failed:',e);documents=[];}
+}
+
+function renderDocs(){
+  const el=document.getElementById('docs-list');
+  if(!el)return;
+  // Category filter chips
+  const cats=['All',...DOC_CATEGORIES];
+  const cf=document.getElementById('doc-cat-filters');
+  if(cf)cf.innerHTML=cats.map(c=>`<button class="filter-chip${activeDocCat===c?' active':''}" onclick="setDocCat('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
+  if(!projectId){el.innerHTML=`<div class="empty"><div class="empty-icon">📁</div><div style="font-weight:600">No project selected</div></div>`;return;}
+  const filtered=activeDocCat==='All'?documents:documents.filter(d=>d.category===activeDocCat);
+  if(!filtered.length){
+    el.innerHTML=`<div class="empty"><div class="empty-icon">📁</div><div style="font-weight:600;margin-bottom:6px">No documents yet</div><div style="font-size:13px;color:var(--text2);margin-bottom:16px">${isAdmin()?'Upload your contract drawings, safety documents, and more.':'No documents have been uploaded yet.'}</div>${isAdmin()?'<button class="primary" onclick="openUploadDocModal()">+ Upload document</button>':''}</div>`;
+    return;
+  }
+  // Group by category
+  const grouped={};
+  filtered.forEach(d=>{if(!grouped[d.category])grouped[d.category]=[];grouped[d.category].push(d);});
+  el.innerHTML=Object.entries(grouped).map(([cat,docs])=>`
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+      <div style="padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3)">${cat}</span>
+        <span style="font-size:11px;color:var(--text3)">${docs.length} file${docs.length!==1?'s':''}</span>
+      </div>
+      ${docs.map(d=>`
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:24px;flex-shrink:0">${docIcon(d.file_type)}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d.name}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">${fmtFileSize(d.file_size)} · ${fmtDate(d.created_at?.slice(0,10))}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <a href="${d.file_url}" target="_blank" style="text-decoration:none;"><button class="sm">View</button></a>
+            <a href="${d.file_url}" download="${d.name}" style="text-decoration:none;"><button class="sm">↓</button></a>
+            ${isAdmin()?`<button class="sm danger" onclick="deleteDocument('${d.id}','${d.name.replace(/'/g,"\\'")}')" >Delete</button>`:''}
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+function setDocCat(cat){activeDocCat=cat;renderDocs();}
+
+// Upload modal
+function openUploadDocModal(){
+  if(!isAdmin()){toast('Only admins can upload documents');return;}
+  document.getElementById('doc-name').value='';
+  document.getElementById('doc-category').value='Contract Drawings';
+  clearDocFile();
+  document.getElementById('upload-doc-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('doc-name').focus(),200);
+}
+function closeUploadDocModal(){document.getElementById('upload-doc-modal').classList.remove('open');}
+function previewDocFile(input){
+  const file=input.files[0];if(!file)return;
+  document.getElementById('doc-file-name').textContent=file.name;
+  document.getElementById('doc-file-size').textContent=fmtFileSize(file.size);
+  document.getElementById('doc-file-preview').style.display='flex';
+  document.getElementById('doc-file-zone').style.display='none';
+  // Auto-fill name if empty
+  const nameEl=document.getElementById('doc-name');
+  if(!nameEl.value){nameEl.value=file.name.replace(/\.[^.]+$/,'');}
+}
+function clearDocFile(){
+  document.getElementById('doc-file-input').value='';
+  document.getElementById('doc-file-preview').style.display='none';
+  document.getElementById('doc-file-zone').style.display='block';
+}
+async function submitUploadDoc(){
+  if(!isAdmin())return;
+  const name=document.getElementById('doc-name').value.trim();
+  if(!name){toast('Enter a document name');return;}
+  const fileInput=document.getElementById('doc-file-input');
+  if(!fileInput.files.length){toast('Select a file to upload');return;}
+  const file=fileInput.files[0];
+  const btn=document.getElementById('btn-upload-doc-submit');
+  btn.disabled=true;btn.textContent='Uploading…';
+  const ext=file.name.split('.').pop();
+  const path=`${projectId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+  const{error:uploadErr}=await sb.storage.from('Documents').upload(path,file,{upsert:true});
+  if(uploadErr){btn.disabled=false;btn.textContent='Upload';toast('Upload failed: '+uploadErr.message);return;}
+  const{data:{publicUrl}}=sb.storage.from('Documents').getPublicUrl(path);
+  const{error:dbErr}=await sb.from('documents').insert({
+    project_id:projectId,name,
+    category:document.getElementById('doc-category').value,
+    file_url:publicUrl,file_type:file.type,file_size:file.size,
+    uploaded_by:currentUser.id
+  });
+  btn.disabled=false;btn.textContent='Upload';
+  if(dbErr){toast('Error saving document: '+dbErr.message);return;}
+  await loadDocuments();closeUploadDocModal();renderDocs();
+  toast('Document uploaded ✓');
+}
+async function deleteDocument(id,name){
+  if(!isAdmin())return;
+  if(!confirm(`Delete "${name}"?\n\nThis cannot be undone.`))return;
+  const{error}=await sb.from('documents').delete().eq('id',id);
+  if(error){toast('Error: '+error.message);return;}
+  documents=documents.filter(d=>d.id!==id);
+  renderDocs();toast('Document deleted');
 }
 
 // ── Item modal ─────────────────────────────────────────────────────
