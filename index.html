@@ -1167,9 +1167,9 @@ async function uploadPhoto(prefix){
   console.log('uploadPhoto: uploading file',file.name,'size',file.size);
   const ext=file.name.split('.').pop()||'jpg';
   const path=`${projectId}/${Date.now()}.${ext}`;
-  const{error}=await sb.storage.from('photos').upload(path,file,{upsert:true});
+  const{error}=await sb.storage.from('Photos').upload(path,file,{upsert:true});
   if(error){console.error('uploadPhoto: storage error',error);toast('Photo upload failed: '+error.message);return null;}
-  const{data}=sb.storage.from('photos').getPublicUrl(path);
+  const{data}=sb.storage.from('Photos').getPublicUrl(path);
   console.log('uploadPhoto: public URL',data?.publicUrl);
   return data?.publicUrl||null;
 }
