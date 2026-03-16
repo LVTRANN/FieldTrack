@@ -462,6 +462,18 @@ body.theme-dark{
       <div class="field"><label>Your name</label><input type="text" id="dm-super" placeholder="Your name"></div>
     </div>
     <div class="field"><label>Notes (optional)</label><input type="text" id="dm-notes" placeholder="e.g. Section B2, Sta 3+20"></div>
+    <div class="field">
+      <label>Photo (optional)</label>
+      <div id="dm-photo-preview" style="display:none;margin-bottom:8px;position:relative;">
+        <img id="dm-photo-img" style="width:100%;max-height:200px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border);">
+        <button onclick="clearPhoto('dm')" style="position:absolute;top:6px;right:6px;padding:3px 8px;font-size:11px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:4px;">Remove</button>
+      </div>
+      <div id="dm-photo-zone" onclick="document.getElementById('dm-photo-input').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+        <div style="font-size:20px;margin-bottom:4px">📷</div>
+        <div style="font-size:12px;color:var(--text2)">Tap to take or upload a photo</div>
+        <input type="file" id="dm-photo-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto('dm',this)">
+      </div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button style="flex:1" onclick="closeDailyModal()">Cancel</button>
       <button class="primary" style="flex:1" id="btn-submit-entry" onclick="submitDailyEntry()">Log entry</button>
@@ -481,6 +493,18 @@ body.theme-dark{
       <div class="field"><label>Supervisor</label><input type="text" id="el-super" placeholder="Name"></div>
     </div>
     <div class="field"><label>Notes</label><input type="text" id="el-notes" placeholder="e.g. Section B2"></div>
+    <div class="field">
+      <label>Photo</label>
+      <div id="el-photo-preview" style="display:none;margin-bottom:8px;position:relative;">
+        <img id="el-photo-img" style="width:100%;max-height:200px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border);">
+        <button onclick="clearPhoto('el')" style="position:absolute;top:6px;right:6px;padding:3px 8px;font-size:11px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:4px;">Remove</button>
+      </div>
+      <div id="el-photo-zone" onclick="document.getElementById('el-photo-input').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:12px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+        <div style="font-size:16px;margin-bottom:2px">📷</div>
+        <div style="font-size:12px;color:var(--text2)">Tap to replace photo</div>
+        <input type="file" id="el-photo-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto('el',this)">
+      </div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="danger" style="margin-right:auto" id="btn-delete-log-entry" onclick="deleteLogEntry()">Delete entry</button>
       <button onclick="closeEditLogModal()">Cancel</button>
@@ -550,7 +574,7 @@ const sb=supabase.createClient(SUPA_URL,SUPA_KEY);
 let currentUser=null,currentProfile=null,projectId=null;
 let items=[],logEntries=[],groups=[],allProjects=[];
 let selectMode=false,editingItemId=null,dailyItemId=null;
-let renamingGroupName=null,editingLogId=null;
+let renamingGroupName=null,editingLogId=null,editingPhotoUrl=null;
 let activeItemCat='All',activeDailyCat='All';
 let collapsedGroups=new Set();
 let mappingRows=[],mappingHeaders=[];
@@ -1068,13 +1092,16 @@ function renderDailyList(){
               Entries on ${fmtDate(selectedDate)} — <span style="color:var(--accent)">${fmtN(dayTotal)} ${it.unit} total</span>
             </div>
             ${itemEntries.map(e=>`
-              <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg2);border-radius:var(--r);margin-bottom:6px;border:1px solid var(--border)">
-                <div style="flex:1">
-                  <div style="font-size:13px;font-weight:600">${fmtN(e.qty)} ${it.unit}</div>
-                  <div style="font-size:12px;color:var(--text2);margin-top:1px">${e.supervisor_name||'—'}${e.notes?' · <em>'+e.notes+'</em>':''}</div>
+              <div style="padding:9px 12px;background:var(--bg2);border-radius:var(--r);margin-bottom:6px;border:1px solid var(--border)">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="flex:1">
+                    <div style="font-size:13px;font-weight:600">${fmtN(e.qty)} ${it.unit}</div>
+                    <div style="font-size:12px;color:var(--text2);margin-top:1px">${e.supervisor_name||'—'}${e.notes?' · <em>'+e.notes+'</em>':''}</div>
+                  </div>
+                  <button class="sm" onclick="openEditLogModal('${e.id}')" style="flex-shrink:0">Edit</button>
+                  <button class="sm danger" onclick="quickDeleteEntry('${e.id}')" style="flex-shrink:0">Delete</button>
                 </div>
-                <button class="sm" onclick="openEditLogModal('${e.id}')" style="flex-shrink:0">Edit</button>
-                <button class="sm danger" onclick="quickDeleteEntry('${e.id}')" style="flex-shrink:0">Delete</button>
+                ${e.photo_url?`<a href="${e.photo_url}" target="_blank"><img src="${e.photo_url}" style="width:100%;max-height:160px;object-fit:cover;border-radius:var(--r);margin-top:8px;border:1px solid var(--border);display:block;"></a>`:''}
               </div>`).join('')}
           </div>`;
         }).join('')}
@@ -1082,6 +1109,42 @@ function renderDailyList(){
     </div>`;
   }).join('');
 }
+// ── Photo helpers ──────────────────────────────────────────────────
+function previewPhoto(prefix, input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    document.getElementById(prefix+'-photo-img').src=e.target.result;
+    document.getElementById(prefix+'-photo-preview').style.display='block';
+    document.getElementById(prefix+'-photo-zone').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+function clearPhoto(prefix){
+  document.getElementById(prefix+'-photo-input').value='';
+  document.getElementById(prefix+'-photo-img').src='';
+  document.getElementById(prefix+'-photo-preview').style.display='none';
+  document.getElementById(prefix+'-photo-zone').style.display='block';
+  if(prefix==='el') editingPhotoUrl=null;
+}
+function showExistingPhoto(prefix, url){
+  if(!url){clearPhoto(prefix);return;}
+  document.getElementById(prefix+'-photo-img').src=url;
+  document.getElementById(prefix+'-photo-preview').style.display='block';
+  document.getElementById(prefix+'-photo-zone').style.display='none';
+}
+async function uploadPhoto(prefix){
+  const input=document.getElementById(prefix+'-photo-input');
+  if(!input.files.length) return null;
+  const file=input.files[0];
+  const ext=file.name.split('.').pop();
+  const path=`${projectId}/${Date.now()}.${ext}`;
+  const{data,error}=await sb.storage.from('photos').upload(path,file,{upsert:true});
+  if(error){toast('Photo upload failed: '+error.message);return null;}
+  const{data:{publicUrl}}=sb.storage.from('photos').getPublicUrl(path);
+  return publicUrl;
+}
+
 function openDailyModal(itemId){
   if(!isSupervisorOrAdmin()){toast('No permission to log entries');return;}
   const it=items.find(i=>i.id===itemId);if(!it)return;
@@ -1093,6 +1156,7 @@ function openDailyModal(itemId){
   document.getElementById('dm-date').value=document.getElementById('entry-date')?.value||today();
   document.getElementById('dm-super').value=currentProfile?.full_name||'';
   document.getElementById('dm-notes').value='';
+  clearPhoto('dm');
   document.getElementById('daily-modal').classList.add('open');
   setTimeout(()=>document.getElementById('dm-qty').focus(),300);
 }
@@ -1102,7 +1166,9 @@ async function submitDailyEntry(){
   if(!qty||qty<=0){toast('Enter a valid quantity');return;}
   const btn=document.getElementById('btn-submit-entry');
   btn.disabled=true;btn.textContent='Saving…';
-  const payload={item_id:dailyItemId,project_id:projectId,qty,entry_date:document.getElementById('dm-date').value,supervisor_name:document.getElementById('dm-super').value||currentProfile?.full_name||'Unknown',notes:document.getElementById('dm-notes').value.trim(),created_by:currentUser.id};
+  // Upload photo if attached
+  const photo_url=await uploadPhoto('dm');
+  const payload={item_id:dailyItemId,project_id:projectId,qty,entry_date:document.getElementById('dm-date').value,supervisor_name:document.getElementById('dm-super').value||currentProfile?.full_name||'Unknown',notes:document.getElementById('dm-notes').value.trim(),created_by:currentUser.id,photo_url};
   const{error}=await sb.from('log_entries').insert(payload);
   btn.disabled=false;btn.textContent='Log entry';
   if(error){toast('Error: '+error.message);return;}
@@ -1122,15 +1188,17 @@ function openEditLogModal(entryId){
   const e=logEntries.find(e=>e.id===entryId);if(!e)return;
   const it=items.find(i=>i.id===e.item_id);
   editingLogId=entryId;
+  editingPhotoUrl=e.photo_url||null;
   document.getElementById('edit-log-item-info').textContent=it?it.item_number+' — '+it.description:'Unknown item';
   document.getElementById('el-qty').value=e.qty;
   document.getElementById('el-date').value=e.entry_date;
   document.getElementById('el-super').value=e.supervisor_name||'';
   document.getElementById('el-notes').value=e.notes||'';
+  if(e.photo_url){showExistingPhoto('el',e.photo_url);}else{clearPhoto('el');}
   document.getElementById('edit-log-modal').classList.add('open');
   setTimeout(()=>document.getElementById('el-qty').focus(),300);
 }
-function closeEditLogModal(){document.getElementById('edit-log-modal').classList.remove('open');editingLogId=null;}
+function closeEditLogModal(){document.getElementById('edit-log-modal').classList.remove('open');editingLogId=null;editingPhotoUrl=null;}
 async function saveLogEntry(){
   const qty=parseFloat(document.getElementById('el-qty').value);
   if(!qty||qty<=0){toast('Enter a valid quantity');return;}
@@ -1138,16 +1206,16 @@ async function saveLogEntry(){
   const supervisor_name=document.getElementById('el-super').value.trim();
   const notes=document.getElementById('el-notes').value.trim();
   const btn=document.getElementById('btn-save-log-entry');btn.disabled=true;btn.textContent='Saving…';
-  const{data,error}=await sb.from('log_entries')
-    .update({qty,entry_date,supervisor_name,notes})
-    .eq('id',editingLogId)
-    .select()
-    .single();
+  let photo_url=editingPhotoUrl;
+  const newPhoto=await uploadPhoto('el');
+  if(newPhoto) photo_url=newPhoto;
+  const{error}=await sb.from('log_entries')
+    .update({qty,entry_date,supervisor_name,notes,photo_url})
+    .eq('id',editingLogId);
   btn.disabled=false;btn.textContent='Save';
   if(error){toast('Error: '+error.message);return;}
-  // Update local state immediately so UI reflects change without full reload
   const idx=logEntries.findIndex(e=>e.id===editingLogId);
-  if(idx!==-1){logEntries[idx]={...logEntries[idx],qty,entry_date,supervisor_name,notes};}
+  if(idx!==-1){logEntries[idx]={...logEntries[idx],qty,entry_date,supervisor_name,notes,photo_url};}
   closeEditLogModal();
   renderDailyList();renderItems();renderLog();
   toast('Entry updated ✓');
@@ -1287,6 +1355,7 @@ function renderLog(){
         <div style="font-size:12px;color:var(--text2)">${fmtDate(e.entry_date)} · ${e.supervisor_name||'—'}${e.notes?' · <em>'+e.notes+'</em>':''}</div>
         ${isSupervisorOrAdmin()?`<button class="sm" style="flex-shrink:0;font-size:11px;padding:3px 9px" onclick="openEditLogModal('${e.id}')">Edit</button>`:''}
       </div>
+      ${e.photo_url?`<a href="${e.photo_url}" target="_blank" style="display:block;margin-top:8px;"><img src="${e.photo_url}" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border);"></a>`:''}
     </div></div>`;
   }).join('');
 }
