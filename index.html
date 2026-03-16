@@ -245,6 +245,7 @@ body.theme-dark{
 .report-tbl td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
 .report-tbl tr:last-child td{border-bottom:none;}
 .report-tbl tr:hover td{background:var(--bg);}
+.report-tbl .no-print{width:70px;text-align:center;padding:6px;}
 .report-tbl-wrap{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;overflow-x:auto;}
 .no-print{display:block;}
 /* Print handled via printReport() window */
@@ -1587,7 +1588,7 @@ function buildReportHTML(periodLabel, periodType, rangeEntries, periodStart, per
                 <td style="text-align:right"><span style="font-weight:600;color:${pct>=100?'var(--success-text)':pct>50?'var(--blue)':'var(--text2)'}">${pct}%</span></td>
                 <td style="text-align:right">${fmtC(d.totalQty*it.unit_price)}</td>
                 <td style="font-size:12px;color:var(--text2)">${periodType==='daily'?notes||'—':''}</td>
-                ${isSupervisorOrAdmin()?`<td class="no-print" style="white-space:nowrap;vertical-align:middle">${d.entries.map(e=>`<button class="sm" style="font-size:11px;padding:3px 8px;margin:1px" onclick="openEditLogModal('${e.id}')">Edit${d.entries.length>1?' ('+fmtN(e.qty)+')':''}</button>`).join('')}</td>`:''}
+                ${isSupervisorOrAdmin()?`<td class="no-print" style="white-space:nowrap;vertical-align:middle;text-align:center">${d.entries.map(e=>`<button class="sm" style="font-size:11px;padding:3px 8px;margin:1px" onclick="openEditLogModal('${e.id}')">Edit${d.entries.length>1?' ('+fmtN(e.qty)+')':''}</button>`).join('<br>')}</td>`:''}
               </tr>${dateBreakdown}`;
             }).join('')}</tbody>
             <tfoot><tr style="background:var(--bg2)">
