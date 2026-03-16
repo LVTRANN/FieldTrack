@@ -1162,17 +1162,18 @@ function openDailyModal(itemId){
   document.getElementById('daily-modal').classList.add('open');
   setTimeout(()=>document.getElementById('dm-qty').focus(),300);
 }
+function closeDailyModal(){
+  document.getElementById('daily-modal').classList.remove('open');
+}
 async function uploadPhoto(prefix){
   const input=document.getElementById(prefix+'-photo-input');
-  if(!input||!input.files.length){console.log('uploadPhoto: no file selected for prefix',prefix);return null;}
+  if(!input||!input.files.length){return null;}
   const file=input.files[0];
-  console.log('uploadPhoto: uploading file',file.name,'size',file.size);
   const ext=file.name.split('.').pop()||'jpg';
   const path=`${projectId}/${Date.now()}.${ext}`;
   const{error}=await sb.storage.from('Photos').upload(path,file,{upsert:true});
-  if(error){console.error('uploadPhoto: storage error',error);toast('Photo upload failed: '+error.message);return null;}
+  if(error){toast('Photo upload failed: '+error.message);return null;}
   const{data}=sb.storage.from('Photos').getPublicUrl(path);
-  console.log('uploadPhoto: public URL',data?.publicUrl);
   return data?.publicUrl||null;
 }
 async function submitDailyEntry(){
@@ -1181,14 +1182,14 @@ async function submitDailyEntry(){
   const btn=document.getElementById('btn-submit-entry');
   btn.disabled=true;btn.textContent='Saving…';
   const photo_url=await uploadPhoto('dm');
-  console.log('submitDailyEntry: photo_url=',photo_url);
   const payload={item_id:dailyItemId,project_id:projectId,qty,entry_date:document.getElementById('dm-date').value,supervisor_name:document.getElementById('dm-super').value||currentProfile?.full_name||'Unknown',notes:document.getElementById('dm-notes').value.trim(),created_by:currentUser.id,photo_url};
-  console.log('submitDailyEntry: payload=',payload);
-  const{data,error}=await sb.from('log_entries').insert(payload).select().single();
-  console.log('submitDailyEntry: result data=',data,'error=',error);
+  const{error}=await sb.from('log_entries').insert(payload);
   btn.disabled=false;btn.textContent='Log entry';
   if(error){toast('Error: '+error.message);return;}
-  await loadLog();closeDailyModal();renderDailyList();renderItems();toast('Entry logged ✓');
+  closeDailyModal();
+  toast('Entry logged ✓');
+  await loadLog();
+  renderDailyList();renderItems();
 }
 
 // ── Edit log entry ─────────────────────────────────────────────────
