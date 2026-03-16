@@ -134,7 +134,7 @@ label{font-size:12px;color:var(--text2);display:block;margin-bottom:5px;font-wei
 /* Modals */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);}
 .modal-bg.open{display:flex;}
-.modal{background:var(--bg-card);border-radius:var(--rl) var(--rl) 0 0;border:1px solid var(--border);padding:20px 20px 32px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;box-shadow:0 -8px 32px rgba(0,0,0,0.2);}
+.modal{background:var(--bg-card);border-radius:var(--rl) var(--rl) 0 0;border:1px solid var(--border);padding:20px 20px 24px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 -8px 32px rgba(0,0,0,0.2);}
 @media(min-width:600px){.modal-bg{align-items:center;}.modal{border-radius:var(--rl);padding:24px;max-height:85vh;}}
 .modal-handle{width:36px;height:4px;border-radius:2px;background:var(--border2);margin:0 auto 18px;}
 .modal-title{font-size:15px;font-weight:600;margin-bottom:16px;letter-spacing:-.2px;}
@@ -452,29 +452,31 @@ body.theme-dark{
 
 <!-- Daily Log Modal -->
 <div class="modal-bg" id="daily-modal" onclick="if(event.target===this)closeDailyModal()">
-  <div class="modal">
+  <div class="modal" style="display:flex;flex-direction:column;">
     <div class="modal-handle"></div>
     <div class="modal-title" id="daily-modal-title">Log quantity</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.4" id="daily-modal-item-info"></div>
-    <div class="field"><label>Quantity installed today</label><input type="number" id="dm-qty" min="0" step="any" inputmode="decimal" placeholder="0"></div>
-    <div class="form-row cols-2">
-      <div class="field"><label>Date</label><input type="date" id="dm-date"></div>
-      <div class="field"><label>Your name</label><input type="text" id="dm-super" placeholder="Your name"></div>
-    </div>
-    <div class="field"><label>Notes (optional)</label><input type="text" id="dm-notes" placeholder="e.g. Section B2, Sta 3+20"></div>
-    <div class="field">
-      <label>Photo (optional)</label>
-      <div id="dm-photo-preview" style="display:none;margin-bottom:8px;position:relative;">
-        <img id="dm-photo-img" style="width:100%;max-height:200px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border);">
-        <button onclick="clearPhoto('dm')" style="position:absolute;top:6px;right:6px;padding:3px 8px;font-size:11px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:4px;">Remove</button>
+    <div style="flex:1;overflow-y:auto;min-height:0;">
+      <div class="field"><label>Quantity installed today</label><input type="number" id="dm-qty" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+      <div class="form-row cols-2">
+        <div class="field"><label>Date</label><input type="date" id="dm-date"></div>
+        <div class="field"><label>Your name</label><input type="text" id="dm-super" placeholder="Your name"></div>
       </div>
-      <div id="dm-photo-zone" onclick="document.getElementById('dm-photo-input').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
-        <div style="font-size:20px;margin-bottom:4px">📷</div>
-        <div style="font-size:12px;color:var(--text2)">Tap to take or upload a photo</div>
-        <input type="file" id="dm-photo-input" accept="image/*" style="display:none" onchange="previewPhoto('dm',this)">
+      <div class="field"><label>Notes (optional)</label><input type="text" id="dm-notes" placeholder="e.g. Section B2, Sta 3+20"></div>
+      <div class="field">
+        <label>Photo (optional)</label>
+        <div id="dm-photo-preview" style="display:none;margin-bottom:8px;position:relative;">
+          <img id="dm-photo-img" style="width:100%;max-height:160px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border);">
+          <button onclick="clearPhoto('dm')" style="position:absolute;top:6px;right:6px;padding:3px 8px;font-size:11px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:4px;">Remove</button>
+        </div>
+        <div id="dm-photo-zone" onclick="document.getElementById('dm-photo-input').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+          <div style="font-size:18px;margin-bottom:3px">📷</div>
+          <div style="font-size:12px;color:var(--text2)">Tap to take or upload a photo</div>
+          <input type="file" id="dm-photo-input" accept="image/*" style="display:none" onchange="previewPhoto('dm',this)">
+        </div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:4px">
+    <div style="display:flex;gap:8px;padding-top:12px;margin-top:4px;border-top:1px solid var(--border);flex-shrink:0;">
       <button style="flex:1" onclick="closeDailyModal()">Cancel</button>
       <button class="primary" style="flex:1" id="btn-submit-entry" onclick="submitDailyEntry()">Log entry</button>
     </div>
