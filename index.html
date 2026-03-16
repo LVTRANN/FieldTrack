@@ -662,7 +662,6 @@ async function bootstrap(){
     document.getElementById('loading-screen').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('entry-date').value=today();
-    document.getElementById('report-date').value=today();
     renderDashboard();
     if(isAdmin())loadUsers();
   }catch(err){
