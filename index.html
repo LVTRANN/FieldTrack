@@ -471,7 +471,7 @@ body.theme-dark{
       <div id="dm-photo-zone" onclick="document.getElementById('dm-photo-input').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
         <div style="font-size:20px;margin-bottom:4px">📷</div>
         <div style="font-size:12px;color:var(--text2)">Tap to take or upload a photo</div>
-        <input type="file" id="dm-photo-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto('dm',this)">
+        <input type="file" id="dm-photo-input" accept="image/*" style="display:none" onchange="previewPhoto('dm',this)">
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -502,7 +502,7 @@ body.theme-dark{
       <div id="el-photo-zone" onclick="document.getElementById('el-photo-input').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:12px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
         <div style="font-size:16px;margin-bottom:2px">📷</div>
         <div style="font-size:12px;color:var(--text2)">Tap to replace photo</div>
-        <input type="file" id="el-photo-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto('el',this)">
+        <input type="file" id="el-photo-input" accept="image/*" style="display:none" onchange="previewPhoto('el',this)">
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -1135,14 +1135,14 @@ function showExistingPhoto(prefix, url){
 }
 async function uploadPhoto(prefix){
   const input=document.getElementById(prefix+'-photo-input');
-  if(!input.files.length) return null;
+  if(!input||!input.files.length) return null;
   const file=input.files[0];
-  const ext=file.name.split('.').pop();
+  const ext=file.name.split('.').pop()||'jpg';
   const path=`${projectId}/${Date.now()}.${ext}`;
-  const{data,error}=await sb.storage.from('photos').upload(path,file,{upsert:true});
+  const{error}=await sb.storage.from('photos').upload(path,file,{upsert:true});
   if(error){toast('Photo upload failed: '+error.message);return null;}
-  const{data:{publicUrl}}=sb.storage.from('photos').getPublicUrl(path);
-  return publicUrl;
+  const{data}=sb.storage.from('photos').getPublicUrl(path);
+  return data?.publicUrl||null;
 }
 
 function openDailyModal(itemId){
