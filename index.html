@@ -383,7 +383,7 @@ body.theme-dark{
     <div class="sec-header"><div class="sec-title">Activity log</div></div>
     <div class="form-row cols-2" style="margin-bottom:12px">
       <div><select id="log-filter-item" onchange="renderLog()"><option value="">All items</option></select></div>
-      <div><select id="log-filter-super" onchange="renderLog()"><option value="">All supervisors</option></select></div>
+      <div><select id="log-filter-super" onchange="renderLog()"><option value="">All staff</option></select></div>
     </div>
     <div class="card" id="log-container"></div>
   </div>
@@ -449,7 +449,7 @@ body.theme-dark{
 
     <div class="card">
       <div class="sec-title" style="margin-bottom:4px">Team & roles</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">In Supabase → Table Editor → profiles, set the <code style="font-family:var(--mono)">role</code> column to <code style="font-family:var(--mono)">admin</code>, <code style="font-family:var(--mono)">supervisor</code>, or <code style="font-family:var(--mono)">viewer</code>.</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">In Supabase → Table Editor → profiles, set the <code style="font-family:var(--mono)">role</code> column to <code style="font-family:var(--mono)">admin</code> (Project Manager), <code style="font-family:var(--mono)">supervisor</code> (Project Superintendent / Coordinator), or <code style="font-family:var(--mono)">viewer</code> (Director).</div>
       <div id="users-list"></div>
       <button class="block" style="margin-top:8px" onclick="loadUsers()">Refresh users</button>
     </div>
@@ -666,6 +666,10 @@ function catStyle(cat){const c=CAT_COLORS[cat]||{bg:'#f1efe8',text:'#5f5e5a'};re
 // ── Helpers ────────────────────────────────────────────────────────
 function isAdmin(){return currentProfile?.role==='admin';}
 function isSupervisorOrAdmin(){return['admin','supervisor'].includes(currentProfile?.role);}
+function roleDisplayName(role){
+  const map={admin:'Project Manager',supervisor:'Project Superintendent',viewer:'Director'};
+  return map[role]||role||'—';
+}
 function getCompleted(item){return logEntries.filter(e=>e.item_id===item.id).reduce((s,e)=>s+Number(e.qty),0);}
 function getPct(item){const c=getCompleted(item);return item.tendered_qty>0?Math.min(100,Math.round(c/item.tendered_qty*100)):0;}
 function pctClass(p){if(p===0)return'pct-0';if(p<30)return'pct-low';if(p<70)return'pct-mid';return p<100?'pct-high':'pct-done';}
@@ -729,7 +733,7 @@ async function bootstrap(){
 
 function applyRoleUI(){
   const role=currentProfile?.role||'viewer';
-  document.getElementById('nav-role-badge').textContent=role;
+  document.getElementById('nav-role-badge').textContent=roleDisplayName(role);
   document.getElementById('nav-role-badge').className='nav-role role-'+role;
   document.getElementById('nav-user-name').textContent=currentProfile?.full_name||currentUser?.email||'';
   if(!isSupervisorOrAdmin())document.getElementById('tab-daily').style.display='none';
@@ -771,7 +775,7 @@ async function loadUsers(){
   const{data}=await sb.from('profiles').select('*').order('full_name');
   if(!data)return;
   const el=document.getElementById('users-list');if(!el)return;
-  el.innerHTML=data.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><div><div style="font-size:13px;font-weight:500">${u.full_name||'—'}</div>${u.id===currentUser.id?'<div style="font-size:12px;color:var(--text2)">(you)</div>':''}</div><span class="nav-role role-${u.role||'viewer'}" style="display:inline-flex;padding:2px 8px;">${u.role||'viewer'}</span></div>`).join('');
+  el.innerHTML=data.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><div><div style="font-size:13px;font-weight:500">${u.full_name||'—'}</div>${u.id===currentUser.id?'<div style="font-size:12px;color:var(--text2)">(you)</div>':''}</div><span class="nav-role role-${u.role||'viewer'}" style="display:inline-flex;padding:2px 8px;">${roleDisplayName(u.role)}</span></div>`).join('');
 }
 function loadProjectFields(p){
   if(!p)return;
@@ -826,7 +830,7 @@ function openNewProjectModal(){
 }
 function closeNewProjectModal(){document.getElementById('new-project-modal').classList.remove('open');}
 async function createNewProject(){
-  if(!isAdmin()){toast('Only admins can create projects');return;}
+  if(!isAdmin()){toast('Only Project Managers can create projects');return;}
   const name=document.getElementById('np-name').value.trim();
   if(!name){toast('Project name is required');return;}
   const payload={name,contract_number:document.getElementById('np-contract').value.trim(),contractor:document.getElementById('np-contractor').value.trim(),start_date:document.getElementById('np-start').value||null,end_date:document.getElementById('np-end').value||null,created_by:currentUser.id};
@@ -856,7 +860,7 @@ function showPage(id){
 
 // ── Project ────────────────────────────────────────────────────────
 async function saveProject(){
-  if(!isAdmin()){toast('Only admins can edit project details');return;}
+  if(!isAdmin()){toast('Only Project Managers can edit project details');return;}
   const payload={name:document.getElementById('proj-name').value.trim(),contract_number:document.getElementById('proj-contract').value.trim(),contractor:document.getElementById('proj-contractor').value.trim(),start_date:document.getElementById('proj-start').value||null,end_date:document.getElementById('proj-end').value||null};
   if(!payload.name){toast('Project name is required');return;}
   let error;
@@ -869,7 +873,7 @@ async function saveProject(){
   toast('Project saved ✓');
 }
 async function deleteProject(){
-  if(!isAdmin()){toast('Only admins can delete projects');return;}
+  if(!isAdmin()){toast('Only Project Managers can delete projects');return;}
   if(!projectId){toast('No project selected');return;}
   const p=allProjects.find(p=>p.id===projectId);
   if(!confirm(`Delete "${p?.name}"?\n\nThis will permanently delete all items, log entries, and groups for this project.\n\nThis cannot be undone.`))return;
@@ -893,7 +897,7 @@ async function deleteProject(){
 
 // ── Groups ─────────────────────────────────────────────────────────
 async function addGroup(){
-  if(!isAdmin()){toast('Only admins can manage groups');return;}
+  if(!isAdmin()){toast('Only Project Managers can manage groups');return;}
   if(!projectId){toast('Save your project first');return;}
   const name=document.getElementById('new-group-name').value.trim();
   if(!name){toast('Enter a group name');return;}
@@ -943,7 +947,7 @@ function populateGroupSelects(){
 // ── Dashboard ──────────────────────────────────────────────────────
 function renderDashboard(){
   const el=document.getElementById('dash-content');
-  if(!items.length){el.innerHTML=`<div class="empty"><div class="empty-icon">🏗️</div><div style="font-weight:600;margin-bottom:6px">No contract loaded</div><div style="margin-bottom:16px">${isAdmin()?'Go to Setup to create your project and import items.':'Contact your administrator to set up the contract.'}</div>${isAdmin()?'<button class="primary" onclick="showPage(\'setup\')">Go to Setup →</button>':''}</div>`;return;}
+  if(!items.length){el.innerHTML=`<div class="empty"><div class="empty-icon">🏗️</div><div style="font-weight:600;margin-bottom:6px">No contract loaded</div><div style="margin-bottom:16px">${isAdmin()?'Go to Setup to create your project and import items.':'Contact your Project Manager to set up the contract.'}</div>${isAdmin()?'<button class="primary" onclick="showPage(\'setup\')">Go to Setup →</button>':''}</div>`;return;}
   const tc=items.reduce((s,it)=>s+it.tendered_qty*it.unit_price,0);
   const te=items.reduce((s,it)=>s+getCompleted(it)*it.unit_price,0);
   const op=tc>0?Math.round(te/tc*100):0;
@@ -1055,7 +1059,7 @@ function toggleDailyGroupCollapse(cat){const key='daily-'+cat;if(collapsedGroups
 
 // ── Select mode ────────────────────────────────────────────────────
 function toggleSelectMode(){
-  if(!isAdmin()){toast('Only admins can select items');return;}
+  if(!isAdmin()){toast('Only Project Managers can select items');return;}
   selectMode=!selectMode;
   const toolbar=document.getElementById('select-toolbar');
   const btn=document.getElementById('btn-select-mode');
@@ -1128,7 +1132,7 @@ async function deleteSelectedItems(){
 
 // ── Daily entry ────────────────────────────────────────────────────
 function renderDailyPage(){
-  if(!isSupervisorOrAdmin()){document.getElementById('daily-items-list').innerHTML='<div class="perm-banner">⚠ Viewer accounts cannot log quantities.</div>';return;}
+  if(!isSupervisorOrAdmin()){document.getElementById('daily-items-list').innerHTML='<div class="perm-banner">⚠ Directors cannot log quantities.</div>';return;}
   const dateEl=document.getElementById('entry-date');if(!dateEl.value)dateEl.value=today();
   if(!items.length){document.getElementById('daily-items-list').innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div style="font-weight:600">No items loaded</div></div>`;return;}
   const cats=getCategories();
@@ -1520,7 +1524,7 @@ function buildReportHTML(periodLabel, periodType, rangeEntries, periodStart, per
     <div class="report-section">
       <div class="report-section-title">Approval</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:4px">
-        <div><div style="padding-top:32px;border-top:1px solid var(--border2)"></div><div style="font-size:12px;color:var(--text2)">Site supervisor signature</div><div style="font-size:12px;color:var(--text2);margin-top:2px">Print name: ___________________________</div></div>
+        <div><div style="padding-top:32px;border-top:1px solid var(--border2)"></div><div style="font-size:12px;color:var(--text2)">Project Superintendent / Coordinator signature</div><div style="font-size:12px;color:var(--text2);margin-top:2px">Print name: ___________________________</div></div>
         <div><div style="padding-top:32px;border-top:1px solid var(--border2)"></div><div style="font-size:12px;color:var(--text2)">Inspector / owner representative</div><div style="font-size:12px;color:var(--text2);margin-top:2px">Print name: ___________________________</div></div>
       </div>
     </div>
@@ -1563,7 +1567,7 @@ function updateLogFilters(){
   si.value=cur;
   const ss=document.getElementById('log-filter-super');const curS=ss.value;
   const supers=[...new Set(logEntries.map(e=>e.supervisor_name).filter(Boolean))].sort();
-  ss.innerHTML='<option value="">All supervisors</option>'+supers.map(s=>`<option value="${s}">${s}</option>`).join('');
+  ss.innerHTML='<option value="">All staff</option>'+supers.map(s=>`<option value="${s}">${s}</option>`).join('');
   ss.value=curS;
 }
 function renderLog(){
@@ -1659,7 +1663,7 @@ function setDocCat(cat){activeDocCat=cat;renderDocs();}
 
 // Upload modal
 function openUploadDocModal(){
-  if(!isAdmin()){toast('Only admins can upload documents');return;}
+  if(!isAdmin()){toast('Only Project Managers can upload documents');return;}
   document.getElementById('doc-name').value='';
   document.getElementById('doc-category').value='Contract Drawings';
   clearDocFile();
@@ -1718,7 +1722,7 @@ async function deleteDocument(id,name){
 
 // ── Item modal ─────────────────────────────────────────────────────
 function openAddItemModal(){
-  if(!isAdmin()){toast('Only admins can add items');return;}
+  if(!isAdmin()){toast('Only Project Managers can add items');return;}
   editingItemId=null;
   document.getElementById('item-modal-title').textContent='Add contract item';
   ['mi-num','mi-desc','mi-unit','mi-qty','mi-price','mi-cat'].forEach(id=>document.getElementById(id).value='');
@@ -1726,7 +1730,7 @@ function openAddItemModal(){
   document.getElementById('item-modal').classList.add('open');
 }
 function openEditItem(id){
-  if(!isAdmin()){toast('Only admins can edit items');return;}
+  if(!isAdmin()){toast('Only Project Managers can edit items');return;}
   editingItemId=id;const it=items.find(i=>i.id===id);if(!it)return;
   document.getElementById('item-modal-title').textContent='Edit item';
   document.getElementById('mi-num').value=it.item_number||'';
@@ -1740,7 +1744,7 @@ function openEditItem(id){
 }
 function closeModal(){document.getElementById('item-modal').classList.remove('open');}
 async function saveItem(){
-  if(!isAdmin()){toast('Only admins can save items');return;}
+  if(!isAdmin()){toast('Only Project Managers can save items');return;}
   if(!projectId){toast('Save your project first');return;}
   const payload={project_id:projectId,item_number:document.getElementById('mi-num').value.trim(),description:document.getElementById('mi-desc').value.trim(),unit:document.getElementById('mi-unit').value.trim()||'ea',tendered_qty:parseFloat(document.getElementById('mi-qty').value)||0,unit_price:parseFloat(document.getElementById('mi-price').value)||0,category:document.getElementById('mi-cat').value.trim()||'Misc',group_id:document.getElementById('mi-group').value||null};
   if(!payload.description){toast('Description is required');return;}
@@ -1832,7 +1836,7 @@ function updateMapPreview(){
 }
 function closeMapModal(){document.getElementById('map-modal').classList.remove('open');}
 async function confirmMapping(){
-  if(!isAdmin()){toast('Only admins can import items');return;}
+  if(!isAdmin()){toast('Only Project Managers can import items');return;}
   if(!projectId){toast('Save your project first');return;}
   const getCol=key=>{const v=document.getElementById('map-'+key)?.value;return v!==''&&v!==undefined?parseInt(v):null;};
   const descCol=getCol('description');if(descCol===null){toast('Description column is required');return;}
