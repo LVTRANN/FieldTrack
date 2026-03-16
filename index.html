@@ -1092,7 +1092,9 @@ function renderItems(){
   Object.values(grouped).forEach(arr=>arr.sort((a,b)=>(a.item_number||'').localeCompare(b.item_number||'',undefined,{numeric:true,sensitivity:'base'})));
   el.innerHTML=Object.entries(grouped).map(([cat,ci])=>{
     const isCollapsed=collapsedGroups.has(cat);
-    const groupPct=ci.length?Math.round(ci.reduce((s,it)=>s+getPct(it),0)/ci.length):0;
+    const groupCV=ci.reduce((s,it)=>s+it.tendered_qty*it.unit_price,0);
+    const groupCE=ci.reduce((s,it)=>s+getCompleted(it)*it.unit_price,0);
+    const groupPct=groupCV>0?Math.min(100,Math.round(groupCE/groupCV*100)):0;
     const safeCat=cat.replace(/'/g,"\\'");
     return`<div>
       <div class="cat-header" onclick="toggleGroupCollapse('${safeCat}')">
@@ -1101,7 +1103,10 @@ function renderItems(){
           <span class="badge-cat" style="${catStyle(cat)}">${cat}</span>
           <span style="font-size:10px;color:var(--text3)">${ci.length} item${ci.length!==1?'s':''}</span>
         </div>
-        <span style="font-size:11px;font-weight:600;color:var(--text2)">${groupPct}%</span>
+        <div style="display:flex;align-items:center;gap:8px;min-width:120px;justify-content:flex-end">
+          <div class="prog-track" style="width:80px;min-width:80px"><div class="prog-fill ${pctClass(groupPct)}" style="width:${groupPct}%"></div></div>
+          <span style="font-size:11px;font-weight:600;color:var(--text2);min-width:32px;text-align:right">${groupPct}%</span>
+        </div>
       </div>
       <div class="cat-items${isCollapsed?' collapsed':''}">
         ${ci.map(it=>{
