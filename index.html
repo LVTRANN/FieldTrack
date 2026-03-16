@@ -363,16 +363,14 @@ body.theme-dark{
   <!-- REPORTS -->
   <div id="page-report" class="page">
     <div class="sec-header no-print">
-      <div id="report-title-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <div class="sec-title" id="report-page-title">Daily report</div>
-        <div style="display:flex;gap:6px;">
+      <div class="sec-title" id="report-page-title">Daily report</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div id="report-date-controls" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>
+        <div style="display:flex;gap:4px;">
           <button id="rtype-daily" class="sm primary" onclick="setReportType('daily')" style="font-size:12px;">Daily</button>
           <button id="rtype-weekly" class="sm" onclick="setReportType('weekly')" style="font-size:12px;">Weekly</button>
           <button id="rtype-monthly" class="sm" onclick="setReportType('monthly')" style="font-size:12px;">Monthly</button>
         </div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <div id="report-date-controls" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>
         <button class="primary" onclick="window.print()">Print / Save PDF</button>
       </div>
     </div>
