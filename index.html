@@ -71,6 +71,7 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);font-size:14
 .nav-role{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;letter-spacing:.3px;}
 .role-admin{background:rgba(224,123,0,0.2);color:var(--accent);}
 .role-supervisor{background:rgba(255,255,255,0.1);color:var(--nav-text);}
+.role-coordinator{background:rgba(255,255,255,0.1);color:var(--nav-text);}
 .role-viewer{background:rgba(255,255,255,0.06);color:var(--nav-text2);}
 
 /* Pages */
@@ -457,13 +458,17 @@ body.theme-dark{
       </div>
 
       <!-- Role legend -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
         <div style="padding:10px 12px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
           <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Project Manager</div>
           <div style="font-size:11px;color:var(--text2);line-height:1.5">Full access — manage contract, items, groups, documents, team</div>
         </div>
         <div style="padding:10px 12px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:700;color:var(--nav-text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Superintendent</div>
+          <div style="font-size:11px;font-weight:700;color:var(--nav-text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Project Superintendent</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5">Log quantities, view reports, activity log, documents</div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--nav-text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Project Coordinator</div>
           <div style="font-size:11px;color:var(--text2);line-height:1.5">Log quantities, view reports, activity log, documents</div>
         </div>
         <div style="padding:10px 12px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
@@ -686,9 +691,9 @@ function catStyle(cat){const c=CAT_COLORS[cat]||{bg:'#f1efe8',text:'#5f5e5a'};re
 
 // ── Helpers ────────────────────────────────────────────────────────
 function isAdmin(){return currentProfile?.role==='admin';}
-function isSupervisorOrAdmin(){return['admin','supervisor'].includes(currentProfile?.role);}
+function isSupervisorOrAdmin(){return['admin','supervisor','coordinator'].includes(currentProfile?.role);}
 function roleDisplayName(role){
-  const map={admin:'Project Manager',supervisor:'Project Superintendent',viewer:'Director'};
+  const map={admin:'Project Manager',supervisor:'Project Superintendent',coordinator:'Project Coordinator',viewer:'Director'};
   return map[role]||role||'—';
 }
 function getCompleted(item){return logEntries.filter(e=>e.item_id===item.id).reduce((s,e)=>s+Number(e.qty),0);}
@@ -813,6 +818,7 @@ async function loadUsers(){
         const roleOptions=[
           {value:'admin',label:'Project Manager'},
           {value:'supervisor',label:'Project Superintendent'},
+          {value:'coordinator',label:'Project Coordinator'},
           {value:'viewer',label:'Director'},
         ];
         return`<div style="display:grid;grid-template-columns:1fr 1fr ${canEdit?'120px':'auto'};align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:12px;" id="user-row-${u.id}">
