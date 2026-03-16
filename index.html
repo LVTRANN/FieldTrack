@@ -401,7 +401,11 @@ body.theme-dark{
       <div class="field"><label>Project name</label><input type="text" id="proj-name" placeholder="Main St. Reconstruction"></div>
       <div class="form-row cols-2">
         <div class="field"><label>Contract #</label><input type="text" id="proj-contract" placeholder="2024-MU-001"></div>
+        <div class="field"><label>Job number</label><input type="text" id="proj-job-number" placeholder="Internal job #"></div>
+      </div>
+      <div class="form-row cols-2">
         <div class="field"><label>Contractor</label><input type="text" id="proj-contractor" placeholder="Acme Construction"></div>
+        <div></div>
       </div>
       <div class="form-row cols-2">
         <div class="field"><label>Start date</label><input type="date" id="proj-start"></div>
@@ -837,6 +841,7 @@ function loadProjectFields(p){
   if(!p)return;
   document.getElementById('proj-name').value=p.name||'';
   document.getElementById('proj-contract').value=p.contract_number||'';
+  document.getElementById('proj-job-number').value=p.job_number||'';
   document.getElementById('proj-contractor').value=p.contractor||'';
   document.getElementById('proj-start').value=p.start_date||'';
   document.getElementById('proj-end').value=p.end_date||'';
@@ -933,7 +938,7 @@ function showPage(id){
 // ── Project ────────────────────────────────────────────────────────
 async function saveProject(){
   if(!isAdmin()){toast('Only Project Managers can edit project details');return;}
-  const payload={name:document.getElementById('proj-name').value.trim(),contract_number:document.getElementById('proj-contract').value.trim(),contractor:document.getElementById('proj-contractor').value.trim(),start_date:document.getElementById('proj-start').value||null,end_date:document.getElementById('proj-end').value||null};
+  const payload={name:document.getElementById('proj-name').value.trim(),contract_number:document.getElementById('proj-contract').value.trim(),job_number:document.getElementById('proj-job-number').value.trim(),contractor:document.getElementById('proj-contractor').value.trim(),start_date:document.getElementById('proj-start').value||null,end_date:document.getElementById('proj-end').value||null};
   if(!payload.name){toast('Project name is required');return;}
   let error;
   if(projectId){({error}=await sb.from('projects').update(payload).eq('id',projectId));}
@@ -960,7 +965,7 @@ async function deleteProject(){
     await switchProject(allProjects[0].id);
   } else {
     // No projects left — clear everything
-    ['proj-name','proj-contract','proj-contractor','proj-start','proj-end'].forEach(id=>document.getElementById(id).value='');
+    ['proj-name','proj-contract','proj-job-number','proj-contractor','proj-start','proj-end'].forEach(id=>document.getElementById(id).value='');
     renderProjectSwitcher();
     updateLogFilters();renderGroupsList();renderDashboard();
   }
@@ -1030,11 +1035,12 @@ function renderDashboard(){
   const catSum=cats.map(cat=>{const ci2=items.filter(it=>getEffectiveGroupName(it)===cat);const cv=ci2.reduce((s,it)=>s+it.tendered_qty*it.unit_price,0);const ce=ci2.reduce((s,it)=>s+getCompleted(it)*it.unit_price,0);return{cat,cv,ce,cp:cv>0?Math.round(ce/cv*100):0};});
   const projName=document.getElementById('proj-name').value||'Unnamed project';
   const contract=document.getElementById('proj-contract').value;
+  const jobNumber=document.getElementById('proj-job-number').value;
   const contractor=document.getElementById('proj-contractor').value;
   el.innerHTML=`
     <div style="margin-bottom:14px">
       <div style="font-size:18px;font-weight:600;letter-spacing:-.3px">${projName}</div>
-      ${contract||contractor?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${[contract,contractor].filter(Boolean).join(' · ')}</div>`:''}
+      ${contract||jobNumber||contractor?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${[contract?'Contract: '+contract:'',jobNumber?'Job: '+jobNumber:'',contractor].filter(Boolean).join(' · ')}</div>`:''}
     </div>
     <div class="ring-wrap">
       <div style="position:relative;width:80px;height:80px;flex-shrink:0">
@@ -1490,7 +1496,9 @@ function buildReportHTML(periodLabel, periodType, rangeEntries, periodStart, per
   const op=tc>0?Math.round(te/tc*100):0;
   const projName=document.getElementById('proj-name').value||'Construction Project';
   const contract=document.getElementById('proj-contract').value;
+  const jobNumber=document.getElementById('proj-job-number').value;
   const contractor=document.getElementById('proj-contractor').value;
+  const metaParts=[contract?'Contract: '+contract:'',jobNumber?'Job: '+jobNumber:'',contractor].filter(Boolean);
   const periodTypeLabel={daily:'Daily report',weekly:'Weekly report',monthly:'Monthly report'}[periodType];
   const qtyColLabel={daily:'Qty this day',weekly:'Qty this week',monthly:'Qty this month'}[periodType];
 
@@ -1498,7 +1506,7 @@ function buildReportHTML(periodLabel, periodType, rangeEntries, periodStart, per
     <div class="report-header">
       <div class="report-header-accent"></div>
       <div class="report-header-project">${projName}</div>
-      <div class="report-header-meta">${[contract,contractor].filter(Boolean).join(' · ')}</div>
+      <div class="report-header-meta">${metaParts.join(' · ')}</div>
       <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:14px;flex-wrap:wrap;gap:8px">
         <div>
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,0.4)">${periodTypeLabel}</div>
