@@ -1578,17 +1578,17 @@ function buildReportHTML(periodLabel, periodType, rangeEntries, periodStart, per
                       ${isSupervisorOrAdmin()?'<td class="no-print"></td>':''}
                     </tr>`).join('')
                 : '';
-              return`<tr>
-                <td style="font-weight:600">${it.item_number}</td>
-                <td>${it.description}${periodType==='daily'?`<br><span style="font-size:11px;color:var(--text2)">${entrySups}</span>`:''}</td>
-                <td>${it.unit}</td>
-                <td style="text-align:right;font-weight:600">${fmtN(d.totalQty)}</td>
-                <td style="text-align:right">${fmtN(totComp)}</td>
-                <td style="text-align:right">${fmtN(it.tendered_qty)}</td>
-                <td style="text-align:right"><span style="font-weight:600;color:${pct>=100?'var(--success-text)':pct>50?'var(--blue)':'var(--text2)'}">${pct}%</span></td>
-                <td style="text-align:right">${fmtC(d.totalQty*it.unit_price)}</td>
-                <td style="font-size:12px;color:var(--text2)">${periodType==='daily'?notes||'—':''}</td>
-                ${isSupervisorOrAdmin()?`<td class="no-print" style="white-space:nowrap;vertical-align:middle;text-align:center">${d.entries.map(e=>`<button class="sm" style="font-size:11px;padding:3px 8px;margin:1px" onclick="openEditLogModal('${e.id}')">Edit${d.entries.length>1?' ('+fmtN(e.qty)+')':''}</button>`).join('<br>')}</td>`:''}
+              return`<tr style="vertical-align:middle">
+                <td style="font-weight:600;vertical-align:middle">${it.item_number}</td>
+                <td style="vertical-align:middle">${it.description}${periodType==='daily'?`<br><span style="font-size:11px;color:var(--text2)">${entrySups}</span>`:''}</td>
+                <td style="vertical-align:middle">${it.unit}</td>
+                <td style="text-align:right;font-weight:600;vertical-align:middle">${fmtN(d.totalQty)}</td>
+                <td style="text-align:right;vertical-align:middle">${fmtN(totComp)}</td>
+                <td style="text-align:right;vertical-align:middle">${fmtN(it.tendered_qty)}</td>
+                <td style="text-align:right;vertical-align:middle"><span style="font-weight:600;color:${pct>=100?'var(--success-text)':pct>50?'var(--blue)':'var(--text2)'}">${pct}%</span></td>
+                <td style="text-align:right;vertical-align:middle">${fmtC(d.totalQty*it.unit_price)}</td>
+                <td style="font-size:12px;color:var(--text2);vertical-align:middle">${periodType==='daily'?notes||'—':''}</td>
+                ${isSupervisorOrAdmin()?`<td class="no-print" style="vertical-align:middle;text-align:center;width:70px;padding:6px;">${d.entries.map(e=>`<button class="sm" style="font-size:11px;padding:3px 8px;display:block;margin:2px auto;" onclick="openEditLogModal('${e.id}')">Edit${d.entries.length>1?' ('+fmtN(e.qty)+')':''}</button>`).join('')}</td>`:''}
               </tr>${dateBreakdown}`;
             }).join('')}</tbody>
             <tfoot><tr style="background:var(--bg2)">
