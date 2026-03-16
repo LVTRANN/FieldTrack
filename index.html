@@ -390,7 +390,10 @@ body.theme-dark{
   <!-- SETUP -->
   <div id="page-setup" class="page">
     <div class="card">
-      <div class="sec-title" style="margin-bottom:12px">Project details</div>
+      <div class="sec-header" style="margin-bottom:12px">
+        <div class="sec-title">Project details</div>
+        <button class="sm danger" onclick="deleteProject()">Delete project</button>
+      </div>
       <div class="field"><label>Project name</label><input type="text" id="proj-name" placeholder="Main St. Reconstruction"></div>
       <div class="form-row cols-2">
         <div class="field"><label>Contract #</label><input type="text" id="proj-contract" placeholder="2024-MU-001"></div>
@@ -807,6 +810,28 @@ async function saveProject(){
   if(idx!==-1)allProjects[idx]={...allProjects[idx],...payload};
   renderProjectSwitcher();
   toast('Project saved ✓');
+}
+async function deleteProject(){
+  if(!isAdmin()){toast('Only admins can delete projects');return;}
+  if(!projectId){toast('No project selected');return;}
+  const p=allProjects.find(p=>p.id===projectId);
+  if(!confirm(`Delete "${p?.name}"?\n\nThis will permanently delete all items, log entries, and groups for this project.\n\nThis cannot be undone.`))return;
+  // Supabase cascades delete items, log_entries, groups via ON DELETE CASCADE
+  const{error}=await sb.from('projects').delete().eq('id',projectId);
+  if(error){toast('Error: '+error.message);return;}
+  // Remove from local state
+  allProjects=allProjects.filter(p=>p.id!==projectId);
+  projectId=null;items=[];logEntries=[];groups=[];
+  // Switch to another project if one exists
+  if(allProjects.length){
+    await switchProject(allProjects[0].id);
+  } else {
+    // No projects left — clear everything
+    ['proj-name','proj-contract','proj-contractor','proj-start','proj-end'].forEach(id=>document.getElementById(id).value='');
+    renderProjectSwitcher();
+    updateLogFilters();renderGroupsList();renderDashboard();
+  }
+  toast('Project deleted');
 }
 
 // ── Groups ─────────────────────────────────────────────────────────
