@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="FieldTrack">
+<meta name="apple-mobile-web-app-title" content="QuantOps">
 <meta name="theme-color" content="#1e1d1a">
-<title>FieldTrack</title>
+<title>QuantOps</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -256,16 +256,16 @@ body.theme-dark{
 
 <div id="loading-screen">
   <div class="spinner"></div>
-  <p>Loading FieldTrack…</p>
+  <p>Loading QuantOps…</p>
 </div>
 
 <div id="auth-screen" style="display:none;">
   <div class="auth-card">
     <div class="auth-brand">
       <div class="auth-icon"><svg viewBox="0 0 24 24"><path d="M2 20h20v2H2v-2zm2-8h2v7H4v-7zm5 0h2v7H9v-7zm4 0h2v7h-2v-7zm5 0h2v7h-2v-7zM2 7l10-5 10 5v2H2V7zm10-3L5.17 7h13.66L12 4z"/></svg></div>
-      <div class="auth-logo">FieldTrack</div>
+      <div class="auth-logo">QuantOps</div>
     </div>
-    <div class="auth-sub">Construction quantity tracker</div>
+    <div class="auth-sub">Construction quantity management</div>
     <div class="auth-error" id="auth-error"></div>
     <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"></div>
     <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -278,7 +278,7 @@ body.theme-dark{
   <div class="nav">
     <div class="nav-brand">
       <div class="nav-brand-icon"><svg viewBox="0 0 24 24"><path d="M2 20h20v2H2v-2zm2-8h2v7H4v-7zm5 0h2v7H9v-7zm4 0h2v7h-2v-7zm5 0h2v7h-2v-7zM2 7l10-5 10 5v2H2V7zm10-3L5.17 7h13.66L12 4z"/></svg></div>
-      <span class="nav-brand-text">FIELDTRACK</span>
+      <span class="nav-brand-text">QUANTOPS</span>
     </div>
     <div style="display:flex;align-items:center;border-right:1px solid var(--nav-border);padding:0;flex-shrink:0;">
       <select id="project-switcher" onchange="switchProject(this.value)" style="background:var(--nav-bg);color:var(--nav-text);border:none;font-size:13px;font-weight:500;padding:0 8px 0 14px;height:52px;cursor:pointer;max-width:180px;outline:none;border-radius:0;appearance:none;-webkit-appearance:none;">
@@ -1990,7 +1990,7 @@ function printReport(){
   win.document.write(`<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8">
-<title>FieldTrack Report</title>
+<title>QuantOps Report</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#1c1b18;background:white;padding:20px;}
