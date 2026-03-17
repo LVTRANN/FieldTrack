@@ -62,7 +62,7 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);font-size:14
 .nav-brand{display:flex;align-items:center;gap:8px;padding:0 16px;height:52px;border-right:1px solid var(--nav-border);flex-shrink:0;}
 .nav-brand-icon{width:26px;height:26px;background:var(--accent);border-radius:4px;display:flex;align-items:center;justify-content:center;}
 .nav-brand-icon svg{width:15px;height:15px;fill:white;}
-.nav-brand-text{font-size:14px;font-weight:600;color:var(--nav-text);letter-spacing:.3px;}
+.nav-brand-text{font-size:16px;font-weight:700;color:var(--nav-text);letter-spacing:.5px;}
 .nav-tab{padding:0 14px;height:52px;display:flex;align-items:center;font-size:13px;cursor:pointer;color:var(--nav-text2);border-bottom:2px solid transparent;transition:all .15s;user-select:none;white-space:nowrap;flex-shrink:0;font-weight:500;}
 .nav-tab:hover{color:var(--nav-text);background:rgba(255,255,255,0.04);}
 .nav-tab.active{color:#fff;border-bottom-color:var(--accent);}
@@ -263,7 +263,7 @@ body.theme-dark{
   <div class="auth-card">
     <div class="auth-brand">
       <div class="auth-icon"><svg viewBox="0 0 24 24"><path d="M2 20h20v2H2v-2zm2-8h2v7H4v-7zm5 0h2v7H9v-7zm4 0h2v7h-2v-7zm5 0h2v7h-2v-7zM2 7l10-5 10 5v2H2V7zm10-3L5.17 7h13.66L12 4z"/></svg></div>
-      <div class="auth-logo">QuantOps</div>
+      <div class="auth-logo">Quant<span style="color:var(--accent)">Ops</span></div>
     </div>
     <div class="auth-sub">Construction quantity management</div>
     <div class="auth-error" id="auth-error"></div>
@@ -278,7 +278,7 @@ body.theme-dark{
   <div class="nav">
     <div class="nav-brand">
       <div class="nav-brand-icon"><svg viewBox="0 0 24 24"><path d="M2 20h20v2H2v-2zm2-8h2v7H4v-7zm5 0h2v7H9v-7zm4 0h2v7h-2v-7zm5 0h2v7h-2v-7zM2 7l10-5 10 5v2H2V7zm10-3L5.17 7h13.66L12 4z"/></svg></div>
-      <span class="nav-brand-text">QUANTOPS</span>
+      <span class="nav-brand-text">Quant<span style="color:var(--accent)">Ops</span></span>
     </div>
     <div style="display:flex;align-items:center;border-right:1px solid var(--nav-border);padding:0;flex-shrink:0;">
       <select id="project-switcher" onchange="switchProject(this.value)" style="background:var(--nav-bg);color:var(--nav-text);border:none;font-size:13px;font-weight:500;padding:0 8px 0 14px;height:52px;cursor:pointer;max-width:180px;outline:none;border-radius:0;appearance:none;-webkit-appearance:none;">
